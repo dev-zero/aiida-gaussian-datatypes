@@ -1,0 +1,32 @@
+{
+    "name": "aiida-plugin-template",
+    "author": "Rico Haeuselmann, Leopold Talirz",
+    "author_email": "haeuselm@epfl.ch",
+    "description": "AiiDA plugin template for testing and getting started with development",
+    "url": "https://github.com/aiidateam/aiida-plugin-template",
+    "license": "Creative Commons",
+    "classifiers": [
+        "Programming Language :: Python"
+    ],
+    "version": "0.1.0",
+    "setup_requires": ["reentry"],
+    "reentry_register": true,
+    "install_requires": [
+        "aiida >= 0.9"
+    ],
+    "entry_points": {
+        "aiida.calculations": [
+            "template.multiply = aiida_plugin_template.calculations.multiply:MultiplyCalculation"
+        ],
+        "aiida.parsers": [
+            "template.product = aiida_plugin_template.parsers.multiply:MultiplyParser"
+        ],
+        "aiida.data": [
+            "template.factors = aiida_plugin_template.data.multiply:MultiplyParameters"
+        ],
+        "console_scripts": [
+            "aiida-template-factors = aiida_plugin_template.console_scripts.data_cli:cli"
+        ]
+    },
+    "scripts": ["examples/cli.py"]
+}
