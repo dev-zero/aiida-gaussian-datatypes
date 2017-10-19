@@ -1,18 +1,14 @@
 import click
 import sys
 
-
 @click.group()
 def cli():
     """Command line interface for template plugin"""
     pass
 
-
 @cli.command()
-def list():  # pylint: disable=redefined-builtin
-    """
-    Display all MultiplyParameters nodes
-    """
+def list():
+    """Display all MultiplyParameters nodes"""
     from aiida import is_dbenv_loaded, load_dbenv
     if not is_dbenv_loaded():
         load_dbenv()
@@ -24,6 +20,8 @@ def list():  # pylint: disable=redefined-builtin
     qb = QueryBuilder()
     qb.append(MultiplyParameters)
     results = qb.all()
+
+    vsep = '\t'
 
     s = ""
     for result in results:
