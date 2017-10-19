@@ -17,12 +17,11 @@
     ],
     "entry_points": {
         "aiida.data": [
-            "gaussian_datatype.basisset = aiida_gaussian_datatypes.data.basisset:BasisSet",
-            "gaussian_datatype.pseudopotential = aiida_gaussian_datatypes.data.pseudopotential:PseudoPotential"
+            "gaussian.basisset = aiida_gaussian_datatypes.data.basisset:BasisSet",
+            "gaussian.pseudo = aiida_gaussian_datatypes.data.pseudopotential:PseudoPotential"
         ],
         "console_scripts": [
             "aiida-gaussian-datatypes-basisset = aiida_template.console_scripts.data_cli:cli"
         ]
-    },
-    "scripts": ["examples/cli.py"]
+    }
 }
