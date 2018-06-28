@@ -1,5 +1,4 @@
-"""Minimal plugin for aiida.
+"""Gaussian Datatypes Plugin for AiiDA.
 
-Use this plugin for testing and as a template for
-getting started with development of new plugins.
+Provides datatypes to store Gaussian Basis Sets and Pseudopotentials.
 """

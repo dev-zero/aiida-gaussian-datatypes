@@ -2,7 +2,7 @@
 """
 Gaussian Basis Set
 
-Copyright (c), 2017 The Gaussian Datatypes Authors (see AUTHORS.txt)
+Copyright (c), 2018 The Gaussian Datatypes Authors (see AUTHORS.txt)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
 documentation files (the "Software"), to deal in the Software without restriction, including without limitation
@@ -146,8 +146,7 @@ class BasisSet(Data):
         """
         Return the UpfFamily group with the given name.
         """
-        q = models.DbNode.objects.filter(
-            type__startswith=BasisSet._query_type_string)
+        q = models.DbNode.objects.filter(type__startswith=BasisSet._query_type_string)
         if filter_elements is not None:
             qtmp = models.DbAttribute.objects.filter(
                 key='element',
@@ -262,8 +261,7 @@ class BasisSet(Data):
 
         return return_oqn, return_ecc
 
-    def add_orbital(self, exp_contr_coeff,
-                    n_qn, l_qn, m_qn, spin=0, contraction=-1):
+    def add_orbital(self, exp_contr_coeff, n_qn, l_qn, m_qn, spin=0, contraction=-1):
         """
         Add an orbital to the list
         :param exp_contr_coeff:  list of exponents and
@@ -288,8 +286,7 @@ class BasisSet(Data):
         self.__expcontr_coeff.append(exp_contr_coeff)
         return True
 
-    def add_whole_basisset(self, atom_kind, tags, quantum_numbers,
-                           exp_contr_coeffs):
+    def add_whole_basisset(self, atom_kind, tags, quantum_numbers, exp_contr_coeffs):
         """
         Add a full set of orbitals to the basis set
         param: atom_kind: name of the atom in the periodic table
@@ -352,18 +349,14 @@ class BasisSet(Data):
         q = models.DbNode.objects.filter(
             type__startswith=self._query_type_string)
 
-        qtmp = models.DbAttribute.objects.filter(
-            key='element',
-            tval=self.__atomkind)
+        qtmp = models.DbAttribute.objects.filter(key='element', tval=self.__atomkind)
         q = q.filter(dbattributes__in=qtmp)
         self._set_attr('element', self.__atomkind)
-        print("There are {} basissets for the {} element in the "
-              "DB".format(len(q), self.__atomkind))
+        print("There are {} basissets for the {} element in the DB".format(len(q), self.__atomkind))
         qtmp = models.DbAttribute.objects.filter(key='id', tval=self.__id)
         q = q.filter(dbattributes__in=qtmp)
         self._set_attr('id', self.__id)
-        print("Among them, there are {} basissets of "
-              "type: {}".format(len(q), self.__id))
+        print("Among them, there are {} basissets of type: {}".format(len(q), self.__id))
         if len(q) > 0:
             print(
                 "ERROR: The new basiset of type {} for the {} "
@@ -371,12 +364,10 @@ class BasisSet(Data):
                 "database\nOr is it a new version of the "
                 "basiset?".format(self.__id, self.__atomkind))
         else:
-            print("SUCCESS: Apploading the basiset {} {} "
-                  .format(self.__atomkind, self.__id))
+            print("SUCCESS: Apploading the basiset {} {} ".format(self.__atomkind, self.__id))
             self._set_attr('version', '1.0')
             self._set_attr('orbital_quantum_numbers', self.__orb_qm_numbers)
-            self._set_attr('exponent_contraction_coefficients',
-                           self.__expcontr_coeff)
+            self._set_attr('exponent_contraction_coefficients', self.__expcontr_coeff)
             self._set_attr('tags', self.__tags)
             self.store()
 
@@ -452,7 +443,6 @@ class BasisSet(Data):
             fh.close()
 
 
-# uncomment for the production run
 def parse_single_cp2k_basiset(basis):
     """
     :param basis:  a list of strings, where each string contains a line read
@@ -491,6 +481,7 @@ def parse_single_cp2k_basiset(basis):
     # This code takes name of the atom and basis set type.
     name, btype = basis[0].split()[0], basis[0].split()[1]
     tags = re.split(r"(?=\D)-(?=\D)", btype, flags=re.I)
+
     # Second line contains the number of blocks
     n_blocks = int(basis[1].split()[0])
     nline = 1
@@ -498,6 +489,7 @@ def parse_single_cp2k_basiset(basis):
     norbital = 0
     exponent_contractioncoefficient = []
     orbital_quantum_numbers = []
+
     # Outer loop. It goes through all blocks containing different sets of orbitals
     while i_bl < n_blocks:
         # going to the third line
