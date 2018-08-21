@@ -31,6 +31,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.intersphinx',
     'sphinx.ext.viewcode',
+    'sphinx_click.ext',
 ]
 
 intersphinx_mapping = {

@@ -37,7 +37,8 @@
             "pylint"
         ],
         "docs": [
-            "sphinx >= 1.8b1"
+            "sphinx >= 1.8b1",
+            "sphinx-click >= 1.0.3"
         ]
     }
 }
