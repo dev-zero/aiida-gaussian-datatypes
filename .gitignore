@@ -7,3 +7,4 @@
 .project
 *.egg*
 .DS_Store
+tags
