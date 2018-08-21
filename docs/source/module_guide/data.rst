@@ -2,11 +2,9 @@
 Data
 ====
 
-Multiply data plugin
+BasisSet data plugin
 ++++++++++++++++++++
 
-.. Add here any	other module you might have
-
-.. automodule:: aiida_plugin_template.data.multiply
+.. automodule:: aiida_gaussian_datatypes.data.basisset
    :members:
 

@@ -1,22 +1,15 @@
-#####################################
-`AiiDA`_ plugin aiida-plugin-template
-#####################################
+########################################
+`AiiDA`_ plugin aiida-gaussian-basissets
+########################################
 
 .. figure:: images/AiiDA_transparent_logo.png
     :width: 250px
     :align: center
-    :height: 100px
+    :height: 60px
 
 .. _AiiDA: http://www.aiida.net
 
-Welcome to the example documentation of the AiiDA plugin ``aiida-plugin-template``
-==================================================================================
-
-The plugin is available at http://github.com/aiidateam/aiida-plugin-template
-
-.. If you use this plugin for your research, please cite the following work:
-
-.. highlights:: Author Name1, Author Name2, *Paper title*, Jornal Name XXX, YYYY (Year).
+The plugin is available at http://github.com/dev-zero/aiida-gaussian-datatypes
 
 If you use AiiDA for your research, please cite the following work:
 
@@ -33,8 +26,8 @@ User's guide
 
    user_guide/index
 
-Modules provided with aiida-quantumespresso (API reference)
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+Modules provided with aiida-gaussian-datatypes (API reference)
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 .. toctree::
    :maxdepth: 4

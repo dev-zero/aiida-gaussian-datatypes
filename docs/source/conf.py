@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# Template file provided by the aiida-plugin-template; modify 
-# according to your needs
-#
 # This file is execfile()d with the current directory set to its
 # containing dir.
 #
@@ -19,7 +16,7 @@ import time
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-import aiida_plugin_template
+import aiida_gaussian_datatypes
 
 # -- General configuration ------------------------------------------------
 
@@ -57,9 +54,9 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'aiida-plugin-template'
-copyright_first_year = 2017
-copyright_owners = "My Institution, Country"
+project = u'aiida-gaussian-datayptes'
+copyright_first_year = 2018
+copyright_owners = "University of Zurich, Switzerland"
 
 current_year = time.localtime().tm_year
 copyright_year_string = current_year if current_year == copyright_first_year else "{}-{}".format(copyright_first_year, current_year)
@@ -70,7 +67,7 @@ copyright = u'{}, {}. All rights reserved'.format(copyright_year_string, copyrig
 # built documents.
 #
 # The full version, including alpha/beta/rc tags.
-release = aiida_plugin_template.__version__
+release = aiida_gaussian_datatypes.__version__
 # The short X.Y version.
 version = '.'.join(release.split('.')[:2])
 
@@ -329,8 +326,10 @@ else:
     settings.BACKEND = "django"
     settings.AIIDADB_PROFILE = "default"
 
-
-
+# make sphinx' autodoc feature also extract __init__
+autodoc_default_options = {
+    'special-members': '__init__',
+}
 
 # Warnings to ignore when using the -n (nitpicky) option
 # We should ignore any python built-in exception, for instance

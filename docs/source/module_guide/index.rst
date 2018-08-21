@@ -1,11 +1,9 @@
-============================================
-Modules provided with plugin (API reference)
-============================================
+===============================================
+Modules provided by this plugin (API reference)
+===============================================
 
 .. toctree::
     :maxdepth: 3
 
-    calculations
     data
-    parsers
 
