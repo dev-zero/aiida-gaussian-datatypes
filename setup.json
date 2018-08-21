@@ -24,7 +24,7 @@
     "setup_requires": ["reentry"],
     "reentry_register": true,
     "install_requires": [
-        "aiida >= 0.11.0"
+        "aiida-core >= 1.0.0a1"
     ],
     "extras_require": {
         "testing": [
@@ -37,7 +37,7 @@
             "pylint"
         ],
         "docs": [
-            "sphinx"
+            "sphinx >= 1.8b1"
         ]
     }
 }
