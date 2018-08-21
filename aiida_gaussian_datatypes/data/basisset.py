@@ -1,594 +1,397 @@
 # -*- coding: utf-8 -*-
 """
-Gaussian Basis Set
+Gaussian Basis Set data object
 
-Copyright (c), 2018 The Gaussian Datatypes Authors (see AUTHORS.txt)
+Copyright (c), 2018 Tiziano Müller
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
-to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions
-of the Software.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
-from __future__ import print_function
-
-import os
-import sys
 import re
 
 from aiida.orm.data import Data
-from aiida.backends.djsite.db import models
 from aiida.common.exceptions import ParsingError
 
 
 def equal_exponents(orb1, orb2):
-    equal = True
-    if len(orb1) != len(orb2):
-        return False
-    else:
-        i = 0
-        while i < len(orb1):
-            if orb1[i][0] != orb2[i][0]:
-                equal = False
-                break
-            i += 1
-    return equal
+    return (len(orb1) == len(orb2)) and all(o1[0] == o2[0] for o1, o2 in zip(orb1, orb2))
 
 
 def equal_coefficients(orb1, orb2):
-    equal = True
-    if len(orb1) != len(orb2):
-        return False
-    else:
-        i = 0
-        while i < len(orb1):
-            if orb1[i][1] != orb2[i][1]:
-                equal = False
-                break
-            i += 1
-    return equal
+    return (len(orb1) == len(orb2)) and all(o1[1] == o2[1] for o1, o2 in zip(orb1, orb2))
+
+
+EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
+BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,2})\s+(?P<family>\S+).*\n')
 
 
 class BasisSet(Data):
     """
-    Provide a general way to store gaussian basissets from different codes within AiiDA framework.
-
-    All important information is stored in the following variables:
-
-
-    *  **__atomkind** - string containing a name of the atom.
-    *  **__basistype** - string containing a basis set type
-    *  **__version** - string containing a version of the basis set
-    *  **__orb_qm_numbers** is a list containing a set of lists, where
-    each of them describes a particular orbital in the following way:
-        [
-            [ N, l, m, s, contracted ],
-            ....
-        ]
-
-        Where:
-        N           - principle quantum number
-        l           - angular momentum
-        m           - magnetic quantum number
-        s           - spin
-        contracted  - [n1,n2], if this orbital is contracted with some other
-        orbitals n1 and n2, []  otherwise.
-    *   **__expcontr_coeff**  is a list containing a set
-    of lists, with a set of exponent + contraction coefficient pairs.
-    For example:
-    [
-           [
-               [ 2838.2104843030,  -0.0007019523 ],
-               [  425.9069835160,  -0.0054237190 ],
-               [   96.6806600316,  -0.0277505669 ],
-                ....
-           ],
-           ....,
-        ]
-
-    __orb_qm_numbers and __expcontr_coeff
-    must be consistent
+    Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
+
+    def __init__(self, atomkind=None, aliases=[], tags=[], orbital_quantum_numbers=[], coefficients=[], **kwargs):
+        """
+        :param atomkind: string containing the name of the element
+        :param aliases: alternative IDs
+        :param tags: additional tags
+        :param orbital_quantum_numbers: see :py:attr:`~orbital_quantum_numbers`
+        :param coefficients: see :py:attr:`~coefficients`
+
+        **Important**: The `orbital_quantum_numbers` and the `coefficients` lists must be consistent
+        """
+
+        super(BasisSet, self).__init__(**kwargs)
+
+        if 'dbnode' in kwargs:
+            return  # node was loaded from database
+
+        if len(orbital_quantum_numbers) != len(coefficients):
+            raise ParsingError("The array with quantum numbers and the array with exponents have different size!")
+
+        if not all(isinstance(entry, tuple) and (len(entry) == 2) for bset in coefficients for entry in bset):
+            raise ParsingError("Coefficients must be a list of a list of tuples")
+
+        # TODO: finalize version information
+        # TODO: check for duplicate
+
+        self._set_attr('id', "-".join(tags))
+        self._set_attr('element', atomkind)
+        self._set_attr('tags', tags)
+        self._set_attr('aliases', aliases)
+        self._set_attr('exponent_contraction_coefficients', coefficients)
+        self._set_attr('orbital_quantum_numbers', orbital_quantum_numbers)
+        self._set_attr('version', 1)
+
+    @classmethod
+    def from_cp2k(cls, data):
+        """
+        Construct a basis set object from a Basis Set in CP2K format
+
+        :param data: file handle or list of lines
+        """
+
+        # TODO: implement filtering
+        # TODO: proper return
+
+        current_basis = []
+
+        for line in data:
+            if EMPTY_LINE_MATCH.match(line):
+                # ignore empty and comment lines
+                continue
+
+            match = BLOCK_MATCH.match(line)
+
+            if match and current_basis:
+                return cls(**parse_single_cp2k_basiset(current_basis))
+
+            current_basis.append(line.strip())
 
     @property
     def element(self):
         """
-        return: element
+        the atomic kind/element this basis set is for
+
+        :rtype: str
         """
         return self.get_attr('element', None)
 
     @property
     def id(self):
         """
-        return: id
+        the ID for this basis set
+
+        :rtype: str
         """
         return self.get_attr('id', None)
 
     @property
+    def aliases(self):
+        """
+        a list of alternative IDs
+
+        :rtype: []
+        """
+        return self.get_attr('aliases', [])
+
+    @property
     def tags(self):
         """
-        return: tags
+        a list of tags
+
+        :rtype: []
         """
-        return self.get_attr('tags', None)
+        return self.get_attr('tags', [])
 
     @property
     def version(self):
         """
-        return: version
+        the version of this basis set
+
+        :rtype: int
         """
         return self.get_attr('version', None)
 
     @property
     def orbital_quantum_numbers(self):
         """
-        return: orbital_quantum_numbers
+        orbital quantum numbers
         """
-        return self.get_attr('orbital_quantum_numbers', None)
+        return self.get_attr('orbital_quantum_numbers', [])
 
     @property
     def exponent_contraction_coefficients(self):
         """
-        return: exponent_contraction_coefficients
+        exponent and contraction coefficients
         """
-        return self.get_attr('exponent_contraction_coefficients', None)
+        return self.get_attr('exponent_contraction_coefficients', [])
 
-    @classmethod
-    def get_basis_sets(cls, filter_elements=None, filter_tags=None):
+    @property
+    def norbitals(self):
         """
-        Return the UpfFamily group with the given name.
-        """
-        q = models.DbNode.objects.filter(type__startswith=BasisSet._query_type_string)
-        if filter_elements is not None:
-            qtmp = models.DbAttribute.objects.filter(
-                key='element',
-                tval=filter_elements)
-            q = q.filter(dbattributes__in=qtmp)
-        if filter_tags:
-            for tag in filter_tags:
-                qtmp = models.DbAttribute.objects.filter(
-                    key__startswith='tags.',
-                    tval=tag)
-                q = q.filter(dbattributes__in=qtmp)
+        the number of orbitals stored in the basis set
 
-        for _ in q:
-            yield _.get_aiida_class()
+        :rtype: int
+        """
+        return len(self.orbitalquantumnumbers)
 
-    def get_norbitals(self):
+    @property
+    def orbitalquantumnumbers(self):
         """
-        Return the number of orbitals stored in the basis set
-        :return an integer number
-        """
-        return len(self.get_all_orbitalquantumnumbers())
+        Return a list of quantum numbers for each orbital::
 
-    def get_all_orbitalquantumnumbers(self):
-        """
-        Return a list of quantum numbers for each orbital:
-        [
-            [ N, l, m, s, contracted ],
-            ....
-        ]
+            [
+                [ N, l, m, s, contracted ],
+            ]
 
         Where:
-        N           - principle quantum number
-        l           - angular momentum
-        m           - magnetic quantum number
-        s           - spin
-        contracted  - [n1,n2], if this orbital is contracted with some other
-        orbitals n1 and n2, []  otherwise.
 
-        return: a python list
-        """
-        try:
-            oqn = self.get_attr('orbital_quantum_numbers')
-        except:
-            print("Your basis set may not be yet stored in the database, "
-                  "trying to access the local data")
-            try:
-                oqn = self.__orb_qm_numbers
-            except:
-                print("I can not find any orbital stored locally")
-                raise
-        return oqn
+        N
+            principle quantum number
+        l
+            angular momentum
+        m
+            magnetic quantum number
+        s
+            spin
+        contracted
+            `[n1,n2]`, if this orbital is contracted with some other orbitals n1 and n2, `[]` otherwise.
 
-    def get_all_exp_contr_coeffs(self):
+        :rtype: []
         """
-        Return a list of exponents and contraction coefficients for each orbital
-        in the following format:
-        [
-           [
-               [ 2838.2104843030,  -0.0007019523 ],
-               [  425.9069835160,  -0.0054237190 ],
-               [   96.6806600316,  -0.0277505669 ],
-                ....
-           ],
-           ....,
-        ]
 
-        :return a python list
-        """
-        try:
-            ecc = self.getorbital_quantum_numbers_attr(
-                'exponent_contraction_coefficients')
-        except:
-            print("Your basis set may not be yet stored in the database, "
-                  "trying to access the local data")
-            try:
-                ecc = self.__expcontr_coeff
-            except:
-                print("I can not find any orbital stored locally")
-                raise
-        return ecc
+        return self.get_attr('orbital_quantum_numbers')
 
-    def get_orbital(self, n_qn, l_qn='all', m_qn='all', spin='all'):
+    @property
+    def coefficients(self):
         """
-        Return two lists:
+        Return a list of exponents and contraction coefficient tuples for each orbital
+        in the following format::
+
+            [
+               [
+                   ( "2838.2104843030",  "-0.0007019523" ),
+                   (  "425.9069835160",  "-0.0054237190" ),
+                   (   "96.6806600316",  "-0.0277505669" ),
+               ],
+            ]
+
+        :rtype: []
+
+        The numbers are intentionally stored as strings to allow for bit-wise reproduction.
+        """
+
+        self.get_attr('exponent_contraction_coefficients')
+
+    def get_orbital(self, n_qn, l_qn='*', m_qn='*', spin='*'):
+        """
+        Return a tuple of two lists:
             * List of orbital quantum numbers
             * List of exponents and contraction coefficients
 
-        :param    n_qn:  principle quantum number
-        :param    l_qn:  angular momentum
-        :param    m_qn:  magnetic quantum number
-        :param    spin:  spin
+        :param    n_qn: principle quantum number
+        :param    l_qn: angular momentum
+        :param    m_qn: magnetic quantum number
+        :param    spin: spin
 
-        :return two python lists
+        :rtype: ([], [])
         """
+
         return_oqn = []
         return_ecc = []
-        oqnumbers = self.get_all_orbitalquantumnumbers()
-        ec_coefficients = self.get_all_exp_contr_coeffs()
-        i = 0
-        for oqn in oqnumbers:
-            print(oqn)
-            if (oqn[0] == n_qn and (l_qn == 'all' or oqn[1] == l_qn)
-               and (oqn[2] == 'all' or oqn[2] == m_qn)
-               and (spin == 'all' or oqn[3] == spin)):
-                return_oqn.append(oqn)
-                return_ecc.append(ec_coefficients[i])
-            i += 1
-        if return_oqn == [] and return_ecc == []:
-            raise ParsingError(
-                "Can not find orbital n={}, l={}, m={}, n={}".format(
-                    n_qn, l_qn, m_qn, n_qn))
+
+        for qnumbers, coeffs in zip(self.orbitalquantumnumbers, self.coefficients):
+            n, l, m, s = qnumbers
+
+            if (n == n_qn) and (l_qn in ['*', l]) and (m_qn in ['*', m]) and (spin in ['*', s]):
+                return_oqn.append((n, l, m, s))
+                return_ecc.append(coeffs)
 
         return return_oqn, return_ecc
 
-    def add_orbital(self, exp_contr_coeff, n_qn, l_qn, m_qn, spin=0, contraction=-1):
+    def to_cp2k(self, fhandle):
         """
-        Add an orbital to the list
-        :param exp_contr_coeff:  list of exponents and
-        contraction coefficients
-        :param    n_qn:  principle quantum number
-        :param    l_qn:  angular momentum
-        :param    m_qn:  magnetic quantum number
-        :param    spin:  spin
+        Write the Basis Set to the passed file handle in the format expected by CP2K.
 
-        :return True/False
-        """
-        try:
-            self.__orb_qm_numbers
-        except:
-            self.__orb_qm_numbers = []
-        self.__orb_qm_numbers.append([int(n_qn), int(l_qn), int(m_qn), spin,
-                                      contraction])
-        try:
-            self.__expcontr_coeff
-        except:
-            self.__expcontr_coeff = []
-        self.__expcontr_coeff.append(exp_contr_coeff)
-        return True
-
-    def add_whole_basisset(self, atom_kind, tags, quantum_numbers, exp_contr_coeffs):
-        """
-        Add a full set of orbitals to the basis set
-        param: atom_kind: name of the atom in the periodic table
-        param: tags: tags characterizing basis
-        param: version: basis set Version
-        param: quantum_numbers: a list containing a set of lists, where each of
-        them describes a particular orbital in the following way:
-        [
-            [ N, l_qn, m_qn, spin, contracted ],
-            ....
-        ]
-
-        Where:
-        N           - principle quantum number
-        l_qn           - angular momentum
-        m_qn           - magnetic quantum number
-        spin           - spin
-        contracted  - [n1,n2], if this orbital is contracted with some other
-        orbitals n1 and n2, []  otherwise.
-        param: exp_contr_coeffs:  a list containing a set of
-        lists, with a set of exponent + contraction coefficient pairs. For
-        example:
-        [
-           [
-               [ 2838.2104843030,  -0.0007019523 ],
-               [  425.9069835160,  -0.0054237190 ],
-               [   96.6806600316,  -0.0277505669 ],
-                ....
-           ],
-           ....,
-        ]
-        return: True/False
-
-        """
-        self.__atomkind = atom_kind
-        self.__tags = tags
-        self.__id = "-".join(tags)
-        if len(quantum_numbers) != len(exp_contr_coeffs):
-            raise ParsingError("The array with quantum numbers and the array"
-                               " with exponents have different size! Something"
-                               " is wrong...")
-        size = len(quantum_numbers)
-        i = 0
-        while i < size:
-            self.add_orbital(exp_contr_coeff=exp_contr_coeffs[i],
-                             n_qn=quantum_numbers[i][0],
-                             l_qn=quantum_numbers[i][1],
-                             m_qn=quantum_numbers[i][2],
-                             spin=quantum_numbers[i][3],
-                             contraction=quantum_numbers[i][4])
-            i += 1
-        return True
-
-    def store_all_in_db(self):
-        """
-        This function which you run once your data are ready to be stored in the
-        database.
+        :param fhandle: A valid output file handle
         """
 
-        q = models.DbNode.objects.filter(
-            type__startswith=self._query_type_string)
+        # we can safely assume to have always at least one set of coefficients
+        to_print = [
+            [
+                [
+                    self.orbital_quantum_numbers[0][0],  # principal quantum number
+                    self.orbital_quantum_numbers[0][1],  # minimal angular quantum number l_min
+                    self.orbital_quantum_numbers[0][1],  # maximal angular quantum number l_max
+                    1,  # the number of contractions for l_min
+                    ],
+                self.exponent_contraction_coefficients[0],  # the respective contraction coefficients
+                ]
+            ]
 
-        qtmp = models.DbAttribute.objects.filter(key='element', tval=self.__atomkind)
-        q = q.filter(dbattributes__in=qtmp)
-        self._set_attr('element', self.__atomkind)
-        print("There are {} basissets for the {} element in the DB".format(len(q), self.__atomkind))
-        qtmp = models.DbAttribute.objects.filter(key='id', tval=self.__id)
-        q = q.filter(dbattributes__in=qtmp)
-        self._set_attr('id', self.__id)
-        print("Among them, there are {} basissets of type: {}".format(len(q), self.__id))
-        if len(q) > 0:
-            print(
-                "ERROR: The new basiset of type {} for the {} "
-                "atom  can NOT be  uploaded because it already exists in the "
-                "database\nOr is it a new version of the "
-                "basiset?".format(self.__id, self.__atomkind))
-        else:
-            print("SUCCESS: Apploading the basiset {} {} ".format(self.__atomkind, self.__id))
-            self._set_attr('version', '1.0')
-            self._set_attr('orbital_quantum_numbers', self.__orb_qm_numbers)
-            self._set_attr('exponent_contraction_coefficients', self.__expcontr_coeff)
-            self._set_attr('tags', self.__tags)
-            self.store()
+        for i in range(1, len(self.orbital_quantum_numbers)):
+            # go through all stored coefficients for (n,l,m,s)
 
-    def print_cp2k(self, filename=None):
-        i = 0
-        j = 0
-        l = 0
-        to_print = []
-        to_print.append([])
-        to_print[j].append([self.orbital_quantum_numbers[i][0],
-                            self.orbital_quantum_numbers[i][1],
-                            self.orbital_quantum_numbers[i][1], len(
-                                self.exponent_contraction_coefficients[i]), 1])
-        to_print[j].append(self.exponent_contraction_coefficients[i])
-
-        i += 1
-        while i < len(self.orbital_quantum_numbers):
             if self.orbital_quantum_numbers[i][0] != self.orbital_quantum_numbers[i - 1][0]:
-                to_print.append([])
-                l = 0
-                j += 1
-                to_print[j].append(
-                    [self.orbital_quantum_numbers[i][0],
-                     self.orbital_quantum_numbers[i][1],
-                     self.orbital_quantum_numbers[i][1], len(
-                         self.exponent_contraction_coefficients[i]), 1])
-                to_print[j].append(self.exponent_contraction_coefficients[i])
-            elif not equal_exponents(
-                    self.exponent_contraction_coefficients[i - 1],
-                    self.exponent_contraction_coefficients[i]):
-                to_print.append([])
-                l = 0
-                j += 1
-                to_print[j].append(
-                    [self.orbital_quantum_numbers[i][0],
-                     self.orbital_quantum_numbers[i][1],
-                     self.orbital_quantum_numbers[i][1], len(
-                         self.exponent_contraction_coefficients[i]), 1])
-                to_print[j].append(self.exponent_contraction_coefficients[i])
-            elif self.orbital_quantum_numbers[i][1] != self.orbital_quantum_numbers[i - 1][1]:
-                to_print[j][0][2] += 1
-                to_print[j].append(self.exponent_contraction_coefficients[i])
-                to_print[j][0].append(1)
-                l += 1
-            elif not equal_coefficients(
-                    self.exponent_contraction_coefficients[i - 1],
-                    self.exponent_contraction_coefficients[i]):
-                to_print[j][0][4 + l] += 1
-                to_print[j].append(self.exponent_contraction_coefficients[i])
-            i += 1
-        if filename and filename != '-':
-            fh = open(filename, 'a')
-        else:
-            fh = sys.stdout
+                # if the current set is NOT for the same primary quantum number as the previous one,
+                # add a new set (can't merge with the previous one)
+                to_print.append([
+                    [
+                        self.orbital_quantum_numbers[i][0],
+                        self.orbital_quantum_numbers[i][1],
+                        self.orbital_quantum_numbers[i][1],  # will be increment if more coefficients are available
+                        1,
+                        ],
+                    self.exponent_contraction_coefficients[i],
+                    ])
 
-        fh.write("{} {}\n".format(self.element, self.id))
-        fh.write("{}\n".format(len(to_print)))
+            elif not equal_exponents(self.exponent_contraction_coefficients[i],
+                                     self.exponent_contraction_coefficients[i - 1]):
+                # if the current set contains a different set of exponents for the same primary quantum number,
+                # add as a separate basis set (can't merge coefficients for those with the previous one)
+                to_print.append([
+                    [
+                        self.orbital_quantum_numbers[i][0],
+                        self.orbital_quantum_numbers[i][1],
+                        self.orbital_quantum_numbers[i][1],  # will be increment if more coefficients are available
+                        1,
+                        ],
+                    self.exponent_contraction_coefficients[i],
+                    ])
+
+            elif self.orbital_quantum_numbers[i][1] != self.orbital_quantum_numbers[i - 1][1]:
+                # in case the primary quantum number and the contraction coefficients are the same as for the previous,
+                # but the orbital quantum number is different, add these contraction coefficients to the previous set
+                to_print[-1][0][2] += 1  # increment the maximum angular momentum contained in this set
+                to_print[-1][0].append(1)  # initialize the number of contractions for this l quantum number
+                to_print[-1].append(self.exponent_contraction_coefficients[i])
+
+            elif not equal_coefficients(self.exponent_contraction_coefficients[i],
+                                        self.exponent_contraction_coefficients[i - 1]):
+                # now, if we got different contraction coefficients for the same n and l quantum numbers and exponents
+                to_print[-1][0][-1] += 1  # increment the number of contractions for this l quantum number
+                to_print[-1].append(self.exponent_contraction_coefficients[i])
+
+        fhandle.write("{} {}\n".format(self.element, self.id))
+        fhandle.write("{}\n".format(len(to_print)))  # the number of sets this basis set contains
+
         for bset in to_print:
-            for out in bset[0]:
-                fh.write("{} ".format(out))
-            fh.write("\n")
-            i = 0
-            while i < bset[0][3]:
-                fh.write("\t", )
-                fh.write("{} {}  ".format(bset[1][i][0], bset[1][i][1]))
-                j = 1
-                while j < sum(bset[0][4:]):
-                    fh.write("{} ".format(bset[1 + j][i][1]))
-                    j += 1
-                fh.write("\n")
-                i += 1
-        if fh is not sys.stdout:
-            fh.close()
+            for out in bset[0]:  # n, l_min, l_max, n_exp, n_cont_l0, n_cont_l1, ...
+                fhandle.write("{} ".format(out))
+
+            fhandle.write("\n")
+
+            for i in range(len(bset[1])):  # go through all expontents
+                # print the exponent:
+                fhandle.write("\t{}".format(bset[1][i][0]))
+
+                for j in range(sum(bset[0][3:])):
+                    # print all contraction coefficients for this exponent:
+                    fhandle.write(" {}".format(bset[1 + j][i][1]))
+
+                fhandle.write("\n")
 
 
 def parse_single_cp2k_basiset(basis):
     """
-    :param basis:  a list of strings, where each string contains a line read
-    from the basis set file. The whole list contains a SINGLE basis set
-
-    :return name: name of the atom in the periodic table
-    :return btype: basis set type
-    :return orbital_quantum_numbers: is a list containing a set of lists, where
-    each of them describes a particular orbital in the following way:
-        [
-            [ N, l, m, s, contracted ],
-            ....
-        ]
-
-        Where:
-        N           - principle quantum number
-        l           - angular momentum
-        m           - magnetic quantum number
-        s           - spin
-        contracted  - [n1,n2], if this orbital is contracted with some other
-        orbitals n1 and n2, []  otherwise.
-
-    :return exponent_contractioncoefficient: s a list containing a set of lists,
-    with a set of exponent + contraction coefficient paris. For example:
-        [
-           [
-               [ 2838.2104843030,  -0.0007019523 ],
-               [  425.9069835160,  -0.0054237190 ],
-               [   96.6806600316,  -0.0277505669 ],
-                ....
-           ],
-           ....,
-        ]
+    :param basis: A list of strings, where each string contains a line read from the basis set file.
+                  The list must one single basis set.
+    :return:      A dictionary containing the atomkind, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
-    # This code takes name of the atom and basis set type.
-    name, btype = basis[0].split()[0], basis[0].split()[1]
-    tags = re.split(r"(?=\D)-(?=\D)", btype, flags=re.I)
+    # the first line contains the element and one or more idientifiers/names
+    identifiers = basis[0].split()
+    name = identifiers.pop(0)
 
-    # Second line contains the number of blocks
-    n_blocks = int(basis[1].split()[0])
-    nline = 1
-    i_bl = 0
-    norbital = 0
+    # put the longest identifier first: some basis sets specify the number of
+    # valence electrons using <IDENTIFIER>-qN
+    identifiers.sort(key=lambda i: -len(i))
+
+    tags = identifiers.pop(0).split('-')
+    aliases = identifiers  # use the remaining identifiers as aliases
+
+    # The second line contains the number of sets, conversion to int ignores any whitespace
+    n_blocks = int(basis[1])
+
+    nline = 2
     exponent_contractioncoefficient = []
     orbital_quantum_numbers = []
 
-    # Outer loop. It goes through all blocks containing different sets of orbitals
-    while i_bl < n_blocks:
-        # going to the third line
-        nline += 1
-        # getting quantum numbers fromt this line. Format is the following:
-        # n                lmin          lmax             nexp
-        #   nshell(lmin) nshell(lmin+1) ... nshell(lmax-1) nshell(lmax)
-        # qnumbers[0]      qnumbers[1]   qnumbers[2]      qnumbers[3]
-        # qnumbers[4] .....
-        qnumbers = basis[nline].split()
+    # go through all blocks containing different sets of orbitals
+    for _ in range(n_blocks):
+        # get the quantum numbers for this set, formatted as follows:
+        # n lmin lmax nexp nshell(lmin) nshell(lmin+1) ... nshell(lmax-1) nshell(lmax)
+        qnumbers = [int(qn) for qn in basis[nline].split()]
+
         # n_different_l is how many DIFFERENT angular momenta we have
-        n_different_l = (int(qnumbers[2])) - (int(qnumbers[1]))
-        #        print basis[nline]
-        l_qn = 0
+        n_different_l = (qnumbers[2]) - (qnumbers[1])
+
         nline += 1
         current_column = 1
 
-        # loop over all different angular momenta
-        while l_qn <= n_different_l:
-            n_shell = 0
-
-            # loop over different shells of a given momenta
-            while n_shell < int(qnumbers[4 + l_qn]):
-                m_qn = -(int(qnumbers[1]) + l_qn)
+        # loop over all different angular momenta: l_min =< l <= l_max
+        for l_qn_idx in range(n_different_l+1):
+            # loop over different shells of a given momentum
+            for _ in range(qnumbers[4 + l_qn_idx]):
 
                 # loop over all possible magnetic quantum numbers
-                while m_qn <= (int(qnumbers[1]) + l_qn):
-                    orbital_quantum_numbers.append([(int(qnumbers[0])), (int(
-                        qnumbers[1])) + l_qn, m_qn, 0, -1])
-                    exponent_contractioncoefficient.append([])
-                    exp_number = 0
-                    norbital += 1
-                    # loop over all exponents
-                    while exp_number < int(qnumbers[3]):
-                        exponent_contractioncoefficient[norbital - 1].append(
-                            [float(basis[nline + exp_number].split()[0]),
-                             float(basis[nline + exp_number].split()[
-                                 current_column
-                             ])])
-                        exp_number += 1
-                    m_qn += 1
-                n_shell += 1
+                for m_qn in range(-(qnumbers[1] + l_qn_idx), qnumbers[1] + l_qn_idx + 1):
+
+                    orbital_quantum_numbers.append([qnumbers[0], qnumbers[1] + l_qn_idx, m_qn, 0, []])
+
+                    # loop over all exponents.
+                    # Do NOT convert the values to float to preserve bit-correct reproduction of the values.
+                    exponent_contractioncoefficient.append([
+                        (basis[nline + exp_number].split()[0], basis[nline + exp_number].split()[current_column])
+                        for exp_number in range(qnumbers[3])
+                        ])
+
                 current_column += 1
-            l_qn += 1
-        nline += int(qnumbers[3]) - 1
-        i_bl += 1
-    return (name, tags, orbital_quantum_numbers,
-            exponent_contractioncoefficient)
 
+        # advance by the number of exponents
+        nline += qnumbers[3]
 
-def upload_cp2k_basissetfile(filename):
-    """
-    Read different basis sets from a file and store them into a database
-
-    :param filename: string containing a path to a file with basis sets
-    """
-    if not os.path.exists(filename):
-        raise ValueError("Not a valid file")
-    with open(filename) as fptr:
-        txt = fptr.read()
-        fptr.close()
-    txt_splitted = txt.split('\n')
-    txt_splitted_no_comments = []
-    # Removing comments and empty lines from the text and store each
-    # line as a single element of a list
-    for line in txt_splitted:
-        # Do not read the part of text, which comes after '#' symbol
-        tmp_line = line.split('#')[0].lstrip()
-        # Do not store empty lines
-        if tmp_line != "":
-            txt_splitted_no_comments.append(tmp_line)
-#    print txt_splitted_no_comments
-    tmp_basis = []  # here each single basis set will be stored temporary
-    n_blocks = 0
-    line_number = 0
-    n_rows = 0
-    # Going through the whole text.
-    for line in txt_splitted_no_comments:
-        tmp_basis.append(line)
-        #        print line, "|", n_blocks, n_rows, line_number
-        # First two lines contain Basis set name and the number of blocks. So they
-        # are treated differently then other parts of the basis
-        if line_number < 2:
-            if len(tmp_basis) == 2:
-                n_blocks = int(tmp_basis[1].split()[0])
-        else:
-            if n_blocks == 0 and n_rows == 1:  # conditions to finish reading
-                # of the basis set
-                # Using regular expressions to remove text in parantheses from the very first
-                # line, which contains the name of the basis set
-                tmp_basis[0] = re.sub('\([^)]*\)', '', tmp_basis[0])  # pylint: disable=anomalous-backslash-in-string
-                name, tags, orbqn, expn = parse_single_cp2k_basiset(tmp_basis)
-                cp2k_basis = BasisSet()
-                cp2k_basis.add_whole_basisset(name, tags, orbqn, expn)
-                cp2k_basis.store_all_in_db()
-                tmp_basis = []  # empty the temporary basis set storage
-                line_number = -1
-            if n_rows == 0:  # condition to move to the other block of orbitals
-                n_rows = int(tmp_basis[-1].split()[3]) + 1
-                n_blocks -= 1
-            n_rows -= 1
-        line_number += 1
+    return {
+            'atomkind': name,
+            'tags': tags,
+            'aliases': aliases,
+            'orbital_quantum_numbers': orbital_quantum_numbers,
+            'coefficients': exponent_contractioncoefficient,
+            }
