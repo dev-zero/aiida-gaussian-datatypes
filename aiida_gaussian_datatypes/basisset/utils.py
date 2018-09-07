@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gaussian Basis Set data object
+Gaussian Basis Set helper functions
 
 Copyright (c), 2018 Tiziano Müller
 
@@ -23,11 +23,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import re
-
-EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
-BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,2})\s+(?P<family>\S+).*\n')
-
 
 def write_cp2k_basisset(fhandle, atomkind, name, orbital_quantum_numbers, coefficients):
     """
@@ -49,9 +44,6 @@ def write_cp2k_basisset(fhandle, atomkind, name, orbital_quantum_numbers, coeffi
             coefficients[0],  # the respective contraction coefficients
             ]
         ]
-
-    total_width = 0
-    n_decimals = 0
 
     for i in range(1, len(orbital_quantum_numbers)):
         # go through all stored coefficients for (n,l,m,s)
