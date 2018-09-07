@@ -165,10 +165,10 @@ def parse_single_cp2k_basisset(basis):
         nline += qnumbers[3]
 
     return {
-            'atomkind': atomkind,
-            'name': name,
-            'tags': tags,
-            'aliases': aliases,
-            'orbital_quantum_numbers': orbital_quantum_numbers,
-            'coefficients': coefficients,
-            }
+        'atomkind': atomkind,
+        'name': name,
+        'tags': tags,
+        'aliases': aliases,
+        'orbital_quantum_numbers': orbital_quantum_numbers,
+        'coefficients': coefficients,
+        }
