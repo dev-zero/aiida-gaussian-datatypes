@@ -24,87 +24,32 @@ SOFTWARE.
 """
 
 
-def write_cp2k_basisset(fhandle, atomkind, name, orbital_quantum_numbers, coefficients):
+import numpy
+
+
+def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:> #14.12f}")):
     """
     Write the Basis Set to the passed file handle in the format expected by CP2K.
 
     :param fhandle: A valid output file handle
     """
 
-    # we can safely assume to have always at least one set of coefficients
-    to_print = [
-        [
-            [
-                orbital_quantum_numbers[0][0],  # principal quantum number
-                orbital_quantum_numbers[0][1],  # minimal angular quantum number l_min
-                orbital_quantum_numbers[0][1],  # maximal angular quantum number l_max
-                len(coefficients[0]),  # number of exponents
-                1,  # the number of contractions for l_min
-                ],
-            coefficients[0],  # the respective contraction coefficients
-            ]
-        ]
+    fhandle.write("{} {}\n".format(element, name))
+    fhandle.write("{}\n".format(len(blocks)))  # the number of sets this basis set contains
 
-    for i in range(1, len(orbital_quantum_numbers)):
-        # go through all stored coefficients for (n,l,m,s)
+    e_fmt, c_fmt = fmts
 
-        if orbital_quantum_numbers[i][0] != orbital_quantum_numbers[i - 1][0]:
-            # if the current set is NOT for the same primary quantum number as the previous one,
-            # add a new set (can't merge with the previous one)
-            to_print.append([
-                [
-                    orbital_quantum_numbers[i][0],
-                    orbital_quantum_numbers[i][1],
-                    orbital_quantum_numbers[i][1],  # will be increment if more coefficients are available
-                    len(coefficients[i]),
-                    1,
-                    ],
-                coefficients[i],
-                ])
-
-        elif coefficients[i] != coefficients[i - 1]:
-            # if the current set contains a different set of exponents for the same primary quantum number,
-            # add as a separate basis set (can't merge coefficients for those with the previous one)
-            to_print.append([
-                [
-                    orbital_quantum_numbers[i][0],
-                    orbital_quantum_numbers[i][1],
-                    orbital_quantum_numbers[i][1],  # will be increment if more coefficients are available
-                    len(coefficients[i]),
-                    1,
-                    ],
-                coefficients[i],
-                ])
-
-        elif orbital_quantum_numbers[i][1] != orbital_quantum_numbers[i - 1][1]:
-            # in case the primary quantum number and the contraction coefficients are the same as for the previous,
-            # but the orbital quantum number is different, add these contraction coefficients to the previous set
-            to_print[-1][0][2] += 1  # increment the maximum angular momentum contained in this set
-            to_print[-1][0].append(1)  # initialize the number of contractions for this l quantum number
-            to_print[-1].append(coefficients[i])
-
-        elif coefficients[i] != coefficients[i - 1]:
-            # now, if we got different contraction coefficients for the same n and l quantum numbers and exponents
-            to_print[-1][0][-1] += 1  # increment the number of contractions for this l quantum number
-            to_print[-1].append(coefficients[i])
-
-    max_width = max(len(coeff) for shell in coefficients for exp_coeff in shell for coeff in exp_coeff)
-
-    fhandle.write("{} {}\n".format(atomkind, name))
-    fhandle.write("{}\n".format(len(to_print)))  # the number of sets this basis set contains
-
-    for bset in to_print:
-        fhandle.write(" ".join(str(n) for n in bset[0]))  # n, l_min, l_max, n_exp, n_cont_l0, n_cont_l1, ...
+    for block in blocks:
+        fhandle.write("{n} {lmin} {lmax} {nexp} ".format(
+            n=block['n'], lmin=block['l'][0][0], lmax=block['l'][-1][0], nexp=len(block['coefficients'])
+            ))
+        fhandle.write(" ".join(str(l[1]) for l in block['l']))
         fhandle.write("\n")
 
-        for i in range(len(bset[1])):  # go through all exponents
-            # print the exponent:
-            fhandle.write("{num:>{width}s}".format(num=bset[1][i][0], width=max_width))
-
-            for j in range(sum(bset[0][4:])):
-                # print all contraction coefficients for this exponent:
-                fhandle.write(" {num:>{width}s}".format(num=bset[1 + j][i][1], width=max_width))
-
+        for row in block['coefficients']:
+            fhandle.write(e_fmt.format(row[0]))
+            fhandle.write(" ")
+            fhandle.write(" ".join(c_fmt.format(f) for f in row[1:]))
             fhandle.write("\n")
 
 
@@ -112,12 +57,12 @@ def parse_single_cp2k_basisset(basis):
     """
     :param basis: A list of strings, where each string contains a line read from the basis set file.
                   The list must one single basis set.
-    :return:      A dictionary containing the atomkind, tags, aliases, orbital_quantum_numbers, coefficients
+    :return:      A dictionary containing the element, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
     # the first line contains the element and one or more idientifiers/names
     identifiers = basis[0].split()
-    atomkind = identifiers.pop(0)
+    element = identifiers.pop(0)
 
     # put the longest identifier first: some basis sets specify the number of
     # valence electrons using <IDENTIFIER>-qN
@@ -131,44 +76,29 @@ def parse_single_cp2k_basisset(basis):
     n_blocks = int(basis[1])
 
     nline = 2
-    coefficients = []
-    orbital_quantum_numbers = []
+
+    blocks = []
 
     # go through all blocks containing different sets of orbitals
     for _ in range(n_blocks):
         # get the quantum numbers for this set, formatted as follows:
         # n lmin lmax nexp nshell(lmin) nshell(lmin+1) ... nshell(lmax-1) nshell(lmax)
-        qnumbers = [int(qn) for qn in basis[nline].split()]
-
-        # n_different_l is how many DIFFERENT angular momenta we have
-        n_different_l = (qnumbers[2]) - (qnumbers[1])
+        qn_n, qn_lmin, qn_lmax, nexp, *ncoeffs = [int(qn) for qn in basis[nline].split()]
 
         nline += 1
-        current_column = 1
 
-        # loop over all different angular momenta: l_min =< l <= l_max
-        for l_qn_idx in range(n_different_l+1):
-            # loop over different shells of a given momentum
-            for _ in range(qnumbers[4 + l_qn_idx]):
-
-                orbital_quantum_numbers.append([qnumbers[0], qnumbers[1] + l_qn_idx])
-
-                # loop over all exponents.
-                coefficients.append([
-                    (basis[nline + exp_number].split()[0], basis[nline + exp_number].split()[current_column])
-                    for exp_number in range(qnumbers[3])
-                    ])
-
-                current_column += 1
+        blocks.append({
+            "n": qn_n,
+            "l": [(l, nl) for l, nl in zip(range(qn_lmin, qn_lmax+1), ncoeffs)],
+            "coefficients": numpy.array([basis[nline+n].split() for n in range(nexp)], dtype=numpy.float64),
+            })
 
         # advance by the number of exponents
-        nline += qnumbers[3]
+        nline += nexp
 
     return {
-        'atomkind': atomkind,
-        'name': name,
+        'element': element,
         'tags': tags,
         'aliases': aliases,
-        'orbital_quantum_numbers': orbital_quantum_numbers,
-        'coefficients': coefficients,
+        'blocks': blocks,
         }

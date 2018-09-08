@@ -49,7 +49,7 @@ def import_basisset(basisset_file, fformat):
     Add a basis sets from a file to the database
     """
 
-    from aiida_gaussian_datatypes.data.basisset import BasisSet
+    from aiida_gaussian_datatypes.basisset.data import BasisSet
 
     loaders = {
         "cp2k": BasisSet.from_cp2k,
@@ -72,7 +72,7 @@ def list_basisset(tags, elements):
     List installed gaussian basis sets
     """
 
-    from aiida_gaussian_datatypes.data.basisset import BasisSet
+    from aiida_gaussian_datatypes.basisset.data import BasisSet
     from aiida.orm.querybuilder import QueryBuilder
 
     columns = OrderedDict([
@@ -84,7 +84,7 @@ def list_basisset(tags, elements):
             ])
 
     query = QueryBuilder()
-    query.append(BasisSet, project=columns.values())
+    query.append(BasisSet, project=list(columns.values()))
 
     if elements is not None:
         query.add_filter(BasisSet, {'attributes.element': {'in': elements}})
@@ -105,7 +105,6 @@ def list_basisset(tags, elements):
 
 
 @cli.command('dump')
-@click.argument('tags', type=str, nargs=-1)
 @click.option('-e', '--elements', type=str, default=None,
               help=("Filter the families only to those containing a basis set for each of the specified elements"))
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
@@ -116,7 +115,7 @@ def dump_basisset(elements, output_format):
     Print specified Basis Sets
     """
 
-    from aiida_gaussian_datatypes.data.basisset import BasisSet
+    from aiida_gaussian_datatypes.basisset.data import BasisSet
     from aiida.orm.querybuilder import QueryBuilder
 
     writers = {

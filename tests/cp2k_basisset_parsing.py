@@ -2,8 +2,10 @@
 import unittest
 
 from six.moves import cStringIO as StringIO
+import numpy
+import numpy.testing as npytesting
 
-from aiida_gaussian_datatypes.data.basisset_utils import parse_single_cp2k_basisset, write_cp2k_basisset
+from aiida_gaussian_datatypes.basisset.utils import parse_single_cp2k_basisset, write_cp2k_basisset
 
 
 class CP2KBasisSetParsingTest(unittest.TestCase):
@@ -23,50 +25,42 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
         
         parsed = parse_single_cp2k_basisset(content.splitlines())
 
+        result = {
+            'atomkind': 'H',
+            'name': 'DZVP-MOLOPT-GTH-q1',
+            'tags': ['DZVP', 'MOLOPT', 'GTH', 'q1'],
+            'aliases': ['DZVP-MOLOPT-GTH'],
+            'blocks': [{
+                "n": 2,
+                "l": [(0, 2), (1, 1)],
+                "coefficients": numpy.array(
+                    [
+                        [11.478000339908,  0.024916243200, -0.012512421400, 0.024510918200],
+                        [ 3.700758562763,  0.079825490000, -0.056449071100, 0.058140794100],
+                        [ 1.446884268432,  0.128862675300,  0.011242684700, 0.444709498500],
+                        [ 0.716814589696,  0.379448894600, -0.418587548300, 0.646207973100],
+                        [ 0.247918564176,  0.324552432600,  0.590363216700, 0.803385018200],
+                        [ 0.066918004004,  0.037148121400,  0.438703133000, 0.892971208700],
+                        [ 0.021708243634, -0.001125195500, -0.059693171300, 0.120101316500],
+                        ]),
+                    },
+                ]
+            }
+
         self.maxDiff = None
+        # compare everything except the blocks
         self.assertEqual(
-            parsed,
-            {
-                'atomkind': 'H',
-                'name': 'DZVP-MOLOPT-GTH-q1',
-                'tags': ['DZVP', 'MOLOPT', 'GTH', 'q1'],
-                'aliases': ['DZVP-MOLOPT-GTH'],
-                'orbital_quantum_numbers': [
-                    [2, 0],
-                    [2, 0],
-                    [2, 1],
-                    ],
-                'coefficients': [
-                    [
-                        ('11.478000339908', '0.024916243200'),
-                        ('3.700758562763', '0.079825490000'),
-                        ('1.446884268432', '0.128862675300'),
-                        ('0.716814589696', '0.379448894600'),
-                        ('0.247918564176', '0.324552432600'),
-                        ('0.066918004004', '0.037148121400'),
-                        ('0.021708243634', '-0.001125195500'),
-                        ],
-                    [
-                        ('11.478000339908', '-0.012512421400'),
-                        ('3.700758562763', '-0.056449071100'),
-                        ('1.446884268432', '0.011242684700'),
-                        ('0.716814589696', '-0.418587548300'),
-                        ('0.247918564176', '0.590363216700'),
-                        ('0.066918004004', '0.438703133000'),
-                        ('0.021708243634', '-0.059693171300'),
-                        ],
-                    [
-                        ('11.478000339908',  '0.024510918200'),
-                        ('3.700758562763',  '0.058140794100'),
-                        ('1.446884268432',  '0.444709498500'),
-                        ('0.716814589696',  '0.646207973100'),
-                        ('0.247918564176',  '0.803385018200'),
-                        ('0.066918004004',  '0.892971208700'),
-                        ('0.021708243634',  '0.120101316500'),
-                        ],
-                    ]
-                }
+            {k: v for k, v in parsed.items() if k != 'blocks'},
+            {k: v for k, v in result.items() if k != 'blocks'}
             )
+        # from the blocks, compare everything except the coefficients
+        self.assertEqual(
+            [{k: v for k, v in block.items() if k != 'coefficients'} for block in parsed['blocks']],
+            [{k: v for k, v in block.items() if k != 'coefficients'} for block in result['blocks']],
+            )
+        # check the coefficients by using the numpy comparison function
+        for pblock, rblock in zip(parsed['blocks'], result['blocks']):
+            npytesting.assert_array_equal(pblock['coefficients'], rblock['coefficients'])
 
     def test_roundtrip_single(self):
 
@@ -76,7 +70,7 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
         parsed = parse_single_cp2k_basisset(content.splitlines())
 
         output = StringIO()
-        write_cp2k_basisset(output, **{k: v for k, v in parsed.items() if k in ['atomkind', 'name', 'orbital_quantum_numbers', 'coefficients']})
+        write_cp2k_basisset(output, **{k: v for k, v in parsed.items() if k in ['atomkind', 'name', 'blocks']})
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(
@@ -92,7 +86,11 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
         parsed = parse_single_cp2k_basisset(content.splitlines())
 
         output = StringIO()
-        write_cp2k_basisset(output, **{k: v for k, v in parsed.items() if k in ['atomkind', 'name', 'orbital_quantum_numbers', 'coefficients']})
+        write_cp2k_basisset(
+            output,
+            **{k: v for k, v in parsed.items() if k in ['atomkind', 'name', 'blocks']},
+            fmts=("{: > #12.9f}", "{: > #12.9f}")  # this basis uses a shorter format
+            )
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(

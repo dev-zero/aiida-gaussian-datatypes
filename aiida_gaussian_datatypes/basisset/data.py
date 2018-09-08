@@ -28,7 +28,6 @@ from __future__ import absolute_import
 import re
 
 from aiida.orm.data import Data
-from aiida.common.exceptions import ParsingError
 
 from .utils import write_cp2k_basisset, parse_single_cp2k_basisset
 
@@ -41,9 +40,9 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(self, atomkind=None, aliases=[], tags=[], orbital_quantum_numbers=[], coefficients=[], **kwargs):
+    def __init__(self, element=None, aliases=[], tags=[], blocks=[], **kwargs):
         """
-        :param atomkind: string containing the name of the element
+        :param element: string containing the name of the element
         :param aliases: alternative IDs
         :param tags: additional tags
         :param orbital_quantum_numbers: see :py:attr:`~orbitalquantumnumbers`
@@ -57,21 +56,15 @@ class BasisSet(Data):
         if 'dbnode' in kwargs:
             return  # node was loaded from database
 
-        if len(orbital_quantum_numbers) != len(coefficients):
-            raise ParsingError("The array with quantum numbers and the array with exponents have different size!")
-
-        if not all(isinstance(entry, tuple) and (len(entry) == 2) for bset in coefficients for entry in bset):
-            raise ParsingError("Coefficients must be a list of a list of tuples")
-
+        # TODO: check format
         # TODO: finalize version information
         # TODO: check for duplicate
 
         self._set_attr('id', "-".join(tags))
-        self._set_attr('element', atomkind)
+        self._set_attr('element', element)
         self._set_attr('tags', tags)
         self._set_attr('aliases', aliases)
-        self._set_attr('exponent_contraction_coefficients', coefficients)
-        self._set_attr('orbital_quantum_numbers', orbital_quantum_numbers)
+        self._set_attr('blocks', blocks)
         self._set_attr('version', 1)
 
     @classmethod
@@ -94,9 +87,12 @@ class BasisSet(Data):
             match = BLOCK_MATCH.match(line)
 
             if match and current_basis:
-                return cls(**parse_single_cp2k_basiset(current_basis))
+                return cls(**parse_single_cp2k_basisset(current_basis))
 
             current_basis.append(line.strip())
+        
+        if current_basis:
+            return cls(**parse_single_cp2k_basisset(current_basis))
 
         return cls()
 
@@ -146,82 +142,31 @@ class BasisSet(Data):
         return self.get_attr('version', None)
 
     @property
-    def norbitals(self):
+    def blocks(self):
         """
-        the number of orbitals stored in the basis set
-
-        :rtype: int
-        """
-        return len(self.orbitalquantumnumbers)
-
-    @property
-    def orbitalquantumnumbers(self):
-        """
-        Return a list of quantum numbers for each orbital::
+        Return the shells/blocks in the following format::
 
             [
-                ( N, l, m ),
-            ]
-
-        Where:
-
-        N
-            principle quantum number
-        l
-            angular momentum
-        m
-            magnetic quantum number
-
-        :rtype: []
-        """
-
-        return self.get_attr('orbital_quantum_numbers', [])
-
-    @property
-    def coefficients(self):
-        """
-        Return a list of exponents and contraction coefficient tuples for each orbital
-        in the following format::
-
-            [
-               [
-                   ( "2838.2104843030",  "-0.0007019523" ),
-                   (  "425.9069835160",  "-0.0054237190" ),
-                   (   "96.6806600316",  "-0.0277505669" ),
-               ],
+                {
+                    "n": 2,
+                    "l": [
+                        (0, 2),  # 2 sets of coefficients for the same exponents for s
+                        (1, 1),  # 1 set of coefficients for the same exponents for p
+                        ],
+                    "blocks": numpy.array(
+                        [
+                            [ "2838.2104843030", "-0.0007019523",  "-0.0007019523", "-0.0007019523" ],
+                            [  "425.9069835160", "-0.0054237190",  "-0.0054237190", "-0.0054237190" ],
+                            [   "96.6806600316", "-0.0277505669",  "-0.0277505669", "-0.0277505669" ],
+                        ],
+                    ],
+                },
             ]
 
         :rtype: []
-
-        The numbers are intentionally stored as strings to allow for bit-wise reproduction.
         """
 
-        self.get_attr('exponent_contraction_coefficients', [])
-
-    def get_orbital(self, n_qn, l_qn='*', m_qn='*'):
-        """
-        Return a tuple of two lists:
-            * List of orbital quantum numbers
-            * List of exponents and contraction coefficients
-
-        :param    n_qn: principle quantum number
-        :param    l_qn: angular momentum
-        :param    m_qn: magnetic quantum number
-
-        :rtype: ([], [])
-        """
-
-        return_oqn = []
-        return_ecc = []
-
-        for qnumbers, coeffs in zip(self.orbitalquantumnumbers, self.coefficients):
-            n, l, m, s = qnumbers
-
-            if (n == n_qn) and (l_qn in ['*', l]) and (m_qn in ['*', m]):
-                return_oqn.append((n, l, m, s))
-                return_ecc.append(coeffs)
-
-        return return_oqn, return_ecc
+        return self.get_attr('blocks', [])
 
     def to_cp2k(self, fhandle):
         """
@@ -230,4 +175,4 @@ class BasisSet(Data):
         :param fhandle: A valid output file handle
         """
 
-        return write_cp2k_basisset(fhandle, self.element, self.id, self.orbitalquantumnumbers, self.coefficients)
+        return write_cp2k_basisset(fhandle, self.element, self.id, self.blocks)
