@@ -40,7 +40,7 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(self, element=None, aliases=[], tags=[], blocks=[], **kwargs):
+    def __init__(self, element=None, name=None, aliases=[], tags=[], blocks=[], **kwargs):
         """
         :param element: string containing the name of the element
         :param aliases: alternative IDs
@@ -60,7 +60,7 @@ class BasisSet(Data):
         # TODO: finalize version information
         # TODO: check for duplicate
 
-        self._set_attr('id', "-".join(tags))
+        self._set_attr('id', name)
         self._set_attr('element', element)
         self._set_attr('tags', tags)
         self._set_attr('aliases', aliases)
@@ -153,7 +153,7 @@ class BasisSet(Data):
                         (0, 2),  # 2 sets of coefficients for the same exponents for s
                         (1, 1),  # 1 set of coefficients for the same exponents for p
                         ],
-                    "blocks": numpy.array(
+                    "blocks":
                         [
                             [ "2838.2104843030", "-0.0007019523",  "-0.0007019523", "-0.0007019523" ],
                             [  "425.9069835160", "-0.0054237190",  "-0.0054237190", "-0.0054237190" ],

@@ -24,9 +24,6 @@ SOFTWARE.
 """
 
 
-import numpy
-
-
 def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:> #14.12f}")):
     """
     Write the Basis Set to the passed file handle in the format expected by CP2K.
@@ -90,7 +87,7 @@ def parse_single_cp2k_basisset(basis):
         blocks.append({
             "n": qn_n,
             "l": [(l, nl) for l, nl in zip(range(qn_lmin, qn_lmax+1), ncoeffs)],
-            "coefficients": numpy.array([basis[nline+n].split() for n in range(nexp)], dtype=numpy.float64),
+            "coefficients": [[float(c) for c in basis[nline+n].split()] for n in range(nexp)]
             })
 
         # advance by the number of exponents
@@ -98,6 +95,7 @@ def parse_single_cp2k_basisset(basis):
 
     return {
         'element': element,
+        'name': name,
         'tags': tags,
         'aliases': aliases,
         'blocks': blocks,
