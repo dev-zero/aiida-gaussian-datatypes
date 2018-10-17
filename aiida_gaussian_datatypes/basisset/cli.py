@@ -24,13 +24,22 @@ SOFTWARE.
 """
 
 import sys
-from collections import OrderedDict
 
 import click
 import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
+
+
+def _formatted_table(bsets):
+    def names_column(name, aliases):
+        return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
+
+    table_content = [(n+1, b.element, names_column(b.name, b.aliases), ', '.join(b.tags), b.version)
+                     for n, b in enumerate(bsets)]
+    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Version'])
+
 
 @verdi_data.group('gaussian.basisset')
 def cli():
@@ -40,11 +49,16 @@ def cli():
 
 @cli.command('import')
 @click.argument('basisset_file', type=click.File(mode='r'))
+@click.option('--sym', '-s', help="filter by atomic symbol")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option('fformat', '-f', '--format',
               type=click.Choice(['cp2k', ]), default='cp2k',
               help="the format of the basis set file")
+@click.option('--duplicates', type=click.Choice(['ignore', 'error', 'new']), default='ignore',
+              help="Whether duplicates should be ignored, produce an error or uploaded as new version")
 @decorators.with_dbenv()
-def import_basisset(basisset_file, fformat):
+def import_basisset(basisset_file, fformat, sym, tags, duplicates):
     """
     Add a basis sets from a file to the database
     """
@@ -55,19 +69,72 @@ def import_basisset(basisset_file, fformat):
         "cp2k": BasisSet.from_cp2k,
         }
 
-    bset = loaders[fformat](basisset_file)
+    filters = {
+        'element': lambda x: not sym or x == sym,
+        'tags': lambda x: not tags or set(tags).issubset(x),
+        }
 
-    click.confirm("Add a Basis Set for '{b.element}' from '{b.id}'?".format(b=bset), abort=True)
+    bsets = loaders[fformat](basisset_file, filters, duplicates)
 
-    bset.store()
+    if not bsets:
+        echo.echo_info("No valid Gaussian Basis Sets found in the given file matching the given criteria")
+        return
+
+    if len(bsets) == 1:
+        bset = bsets[0]
+        click.confirm("Add a Gaussian Basis Set for '{b.element}' from '{b.name}'?".format(b=bset), abort=True)
+        bset.store()
+        return
+
+    echo.echo_info("{} Gaussian Basis Sets found:\n".format(len(bsets)))
+    echo.echo(_formatted_table(bsets))
+    echo.echo("")
+
+    def parse_range(value):
+        if value.startswith('a'):
+            return range(len(bsets))
+
+        if value.startswith('n'):
+            return []
+
+        indexes = []
+
+        try:
+            for spec in value.replace(' \t', '').split(','):
+                try:
+                    begin, end = spec.split('-')
+                except ValueError:
+                    indexes.append(int(spec) - 1)
+                else:
+                    indexes += list(range(int(begin) - 1, int(end)))
+
+        except ValueError:
+            raise click.BadParameter("Invalid range or value specified", param=value)
+
+        if max(indexes) >= len(bsets):
+            raise click.BadParameter("Specified index is out of range", param=max(indexes))
+
+        return sorted(set(indexes))
+
+    indexes = click.prompt("Which Gaussian Basis Set do you want to add?"
+                           " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
+                           value_proc=parse_range)
+
+    for idx in indexes:
+        echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
+        bsets[idx].store()
+        echo.echo("DONE")
 
 
 @cli.command('list')
-@click.argument('tags', metavar='[TAG] [TAG] [...]', type=str, nargs=-1)
-@click.option('-e', '--elements', type=str, default=None,
-              help="Filter the families only to those containing a basis set for each of the specified elements")
+@click.option('-s', '--sym', type=str, default=None,
+              help="filter by a specific element")
+@click.option('-n', '--name', type=str, default=None,
+              help="filter by name")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
 @decorators.with_dbenv()
-def list_basisset(tags, elements):
+def list_basisset(sym, name, tags):
     """
     List installed gaussian basis sets
     """
@@ -75,33 +142,25 @@ def list_basisset(tags, elements):
     from aiida_gaussian_datatypes.basisset.data import BasisSet
     from aiida.orm.querybuilder import QueryBuilder
 
-    columns = OrderedDict([
-            ('ID', 'uuid'),  # the header of the table, the respective property from the DB
-            ('Element', 'attributes.element'),
-            ('Name', 'attributes.id'),
-            ('Aliases', 'attributes.aliases'),
-            ('Tags', 'attributes.tags'),
-            ])
-
     query = QueryBuilder()
-    query.append(BasisSet, project=list(columns.values()))
+    query.append(BasisSet)
 
-    if elements is not None:
-        query.add_filter(BasisSet, {'attributes.element': {'in': elements}})
+    if sym:
+        query.add_filter(BasisSet, {'attributes.element': {'==': sym}})
+
+    if name:
+        query.add_filter(BasisSet, {'attributes.aliases': {'contains': [name]}})
+
+    if tags:
+        query.add_filter(BasisSet, {'attributes.tags': {'contains': tags}})
 
     if not query.count():
         echo.echo("No Gaussian Basis Sets found.")
         return
 
-    def stringify_list(entry):
-        if isinstance(entry, list):
-            return ", ".join(entry)
-        return entry
-
-    entries = [[stringify_list(e) for e in line] for line in query.all()]
-
     echo.echo_info("{} Gaussian Basis Sets found:\n".format(query.count()))
-    echo.echo(tabulate.tabulate(entries, headers=columns.keys()))
+    echo.echo(_formatted_table([bs for [bs] in query.iterall()]))
+    echo.echo("")
 
 
 @cli.command('dump')

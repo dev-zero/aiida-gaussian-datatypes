@@ -25,14 +25,9 @@ SOFTWARE.
 
 from __future__ import absolute_import
 
-import re
-
 from aiida.orm.data import Data
 
-from .utils import write_cp2k_basisset, parse_single_cp2k_basisset
-
-EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
-BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
+from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
 
 
 class BasisSet(Data):
@@ -40,15 +35,14 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(self, element=None, name=None, aliases=[], tags=[], blocks=[], **kwargs):
+    def __init__(self, element=None, name=None, aliases=[], tags=[], blocks=[], version=1, **kwargs):
         """
         :param element: string containing the name of the element
-        :param aliases: alternative IDs
+        :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
+        :param aliases: alternative names
         :param tags: additional tags
         :param orbital_quantum_numbers: see :py:attr:`~orbitalquantumnumbers`
         :param coefficients: see :py:attr:`~coefficients`
-
-        **Important**: The `orbital_quantum_numbers` and the `coefficients` lists must be consistent
         """
 
         super(BasisSet, self).__init__(**kwargs)
@@ -57,44 +51,117 @@ class BasisSet(Data):
             return  # node was loaded from database
 
         # TODO: check format
-        # TODO: finalize version information
-        # TODO: check for duplicate
 
-        self._set_attr('id', name)
+        self._set_attr('name', name)
         self._set_attr('element', element)
         self._set_attr('tags', tags)
         self._set_attr('aliases', aliases)
         self._set_attr('blocks', blocks)
-        self._set_attr('version', 1)
+        self._set_attr('version', version)
+
+    def store(self, *args, **kwargs):
+        """
+        Store the node, ensuring that the combination (element,name,version) is unique.
+        """
+        # TODO: this uniqueness check is not race-condition free.
+
+        from aiida.common.exceptions import UniquenessError, NotExistent
+
+        try:
+            existing = self.get(self.element, self.name, self.version, match_aliases=False)
+        except NotExistent:
+            pass
+        else:
+            raise UniquenessError(
+                "Gaussian Basis Set already exists for element={b.element}, name={b.name}, version={b.version}: {uuid}"
+                .format(uuid=existing.uuid, b=self))
+
+        return super(BasisSet, self).store(*args, **kwargs)
 
     @classmethod
-    def from_cp2k(cls, data):
+    def get(cls, element, name=None, alias=None, version='latest', match_aliases=True):
+        from aiida.orm.querybuilder import QueryBuilder
+        from aiida.common.exceptions import NotExistent
+
+        filters = {
+            'attributes.element': {'==': element},
+            }
+
+        if version != 'latest':
+            filters['attributes.version'] = {'==': version}
+
+        if match_aliases:
+            filters['attributes.aliases'] = {'contains': [name]}
+        else:
+            filters['attributes.name'] = {'==': name}
+
+        query = QueryBuilder()
+        query.append(BasisSet)
+        query.add_filter(BasisSet, filters)
+        query.order_by({BasisSet: [{'attributes.version': {'cast': 'i', 'order': 'desc'}}]})
+
+        existing = query.first()
+
+        if not existing:
+            raise NotExistent("No Gaussian Basis Set found for element={element}, name={name}, version={version}"
+                              .format(element=element, name=name, version=version))
+
+        return existing[0]
+
+    @classmethod
+    def from_cp2k(cls, fhandle, filters, duplicate_handling='ignore'):
         """
-        Construct a basis set object from a Basis Set in CP2K format
+        Constructs a list with basis set objects from a Basis Set in CP2K format
 
-        :param data: file handle or list of lines
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
         """
 
-        # TODO: implement filtering
+        from aiida.orm.querybuilder import QueryBuilder
+        from aiida.common.exceptions import UniquenessError, NotExistent
 
-        current_basis = []
+        def matches_criteria(bset):
+            return all(fspec(bset[field]) for field, fspec in filters.items())
 
-        for line in data:
-            if EMPTY_LINE_MATCH.match(line):
-                # ignore empty and comment lines
-                continue
+        def exists(bset):
+            try:
+                cls.get(bset['element'], bset['name'], match_aliases=False)
+            except NotExistent:
+                return False
 
-            match = BLOCK_MATCH.match(line)
+            return True
 
-            if match and current_basis:
-                return cls(**parse_single_cp2k_basisset(current_basis))
+        bsets = [bs for bs in cp2k_basisset_file_iter(fhandle) if matches_criteria(bs)]
 
-            current_basis.append(line.strip())
-        
-        if current_basis:
-            return cls(**parse_single_cp2k_basisset(current_basis))
+        if duplicate_handling == 'ignore':  # simply filter duplicates
+            bsets = [bs for bs in bsets if not exists(bs)]
 
-        return cls()
+        elif duplicate_handling == 'error':
+            for bset in bsets:
+                try:
+                    latest = cls.get(bset['element'], bset['name'], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    raise UniquenessError(
+                        "Gaussian Basis Set already exists for element={element}, name={name}: {uuid}"
+                        .format(uuid=latest.uuid, **bset))
+
+        elif duplicate_handling == 'new':
+            for bset in bsets:
+                try:
+                    latest = cls.get(bset['element'], bset['name'], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    bset['version'] = latest.version + 1
+
+        else:
+            raise ValueError("Specified duplicate handling strategy not recognized: '{}'".format(duplicate_handling))
+
+        return [cls(**bs) for bs in bsets]
 
     @property
     def element(self):
@@ -106,18 +173,18 @@ class BasisSet(Data):
         return self.get_attr('element', None)
 
     @property
-    def id(self):
+    def name(self):
         """
-        the ID for this basis set
+        the name for this basis set
 
         :rtype: str
         """
-        return self.get_attr('id', None)
+        return self.get_attr('name', None)
 
     @property
     def aliases(self):
         """
-        a list of alternative IDs
+        a list of alternative names
 
         :rtype: []
         """
@@ -175,4 +242,4 @@ class BasisSet(Data):
         :param fhandle: A valid output file handle
         """
 
-        return write_cp2k_basisset(fhandle, self.element, self.id, self.blocks)
+        return write_cp2k_basisset(fhandle, self.element, self.name, self.blocks)

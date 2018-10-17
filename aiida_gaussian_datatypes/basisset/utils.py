@@ -23,6 +23,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import re
+
+
+EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
+BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
+
 
 def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:> #14.12f}")):
     """
@@ -50,6 +56,36 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:
             fhandle.write("\n")
 
 
+def cp2k_basisset_file_iter(fhandle):
+    """
+    Generates a sequence of dicts, one dict for each basis set found in the given file
+
+    :param fhandle: Open file handle (in text mode) to a basis set file
+    """
+
+    # find the beginning of a new basis set entry, then
+    # continue until the next one or the EOF
+
+    current_basis = []
+
+    for line in fhandle:
+        if EMPTY_LINE_MATCH.match(line):
+            # ignore empty and comment lines
+            continue
+
+        match = BLOCK_MATCH.match(line)
+
+        if match and current_basis:
+            yield parse_single_cp2k_basisset(current_basis)
+            current_basis = []
+
+        current_basis.append(line.strip())
+
+    # EOF and we still have lines belonging to a basis set
+    if current_basis:
+        yield parse_single_cp2k_basisset(current_basis)
+
+
 def parse_single_cp2k_basisset(basis):
     """
     :param basis: A list of strings, where each string contains a line read from the basis set file.
@@ -67,7 +103,7 @@ def parse_single_cp2k_basisset(basis):
 
     name = identifiers.pop(0)
     tags = name.split('-')
-    aliases = identifiers  # use the remaining identifiers as aliases
+    aliases = [name] + identifiers  # use the remaining identifiers as aliases
 
     # The second line contains the number of sets, conversion to int ignores any whitespace
     n_blocks = int(basis[1])
