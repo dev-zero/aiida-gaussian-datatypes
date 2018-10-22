@@ -79,7 +79,7 @@ class BasisSet(Data):
         return super(BasisSet, self).store(*args, **kwargs)
 
     @classmethod
-    def get(cls, element, name=None, alias=None, version='latest', match_aliases=True):
+    def get(cls, element, name=None, version='latest', match_aliases=True):
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
@@ -119,7 +119,6 @@ class BasisSet(Data):
         :rtype: list
         """
 
-        from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import UniquenessError, NotExistent
 
         def matches_criteria(bset):

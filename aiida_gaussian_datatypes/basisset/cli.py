@@ -33,6 +33,8 @@ from aiida.cmdline.utils import decorators, echo
 
 
 def _formatted_table(bsets):
+    """generates a formatted table (using tabulate) for the given list of basis sets"""
+
     def names_column(name, aliases):
         return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
@@ -91,6 +93,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
     echo.echo("")
 
     def parse_range(value):
+        """value_proc function to convert the given input to a list of indexes"""
         if value.startswith('a'):
             return range(len(bsets))
 
