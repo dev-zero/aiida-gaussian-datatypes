@@ -1,16 +1,73 @@
+# -*- coding: utf-8 -*-
+"""
+Gaussian Basis Set verdi command line interface
+
+Copyright (c), 2018 Tiziano Müller
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+"""
+
+import sys
+
 import click
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
 
 
-SUPPORTED_OUTPUT_FORMATS = ['cp2k', ]  # other candidates: 'gaussian', 'gamess', 'nwchem'
+SUPPORTED_OUTPUT_FORMATS = ['cp2k', ]  # other candidates: 'Abinit', ...
 
 
 @verdi_data.group('gaussian.pseudo')
 def cli():
     """Manage pseudopotentials for GTO-based codes"""
     pass
+
+
+@cli.command('import')
+@click.argument('pseudopotential_file', type=click.File(mode='r'))
+@click.option('--sym', '-s', help="filter by atomic symbol")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
+@click.option('fformat', '-f', '--format',
+              type=click.Choice(['cp2k', ]), default='cp2k',
+              help="the format of the pseudopotential file")
+@click.option('--duplicates', type=click.Choice(['ignore', 'error', 'new']), default='ignore',
+              help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+@decorators.with_dbenv()
+def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates):
+    """
+    Add a pseudopotential from a file to the database
+    """
+
+    from aiida_gaussian_datatypes.basisset.data import PseudoPotential
+
+    loaders = {
+        "cp2k": PseudoPotential.from_cp2k,
+        }
+
+    pseudo = loaders[fformat](basisset_file)
+
+    click.confirm("Add a Pseudopotential for '{b.element}' from '{b.id}'?".format(b=pseudo), abort=True)
+
+    pseudo.store()
+
 
 
 @cli.command()

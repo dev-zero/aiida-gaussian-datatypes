@@ -24,13 +24,19 @@ DEALINGS IN THE SOFTWARE.
 
 from __future__ import print_function
 
-import re
-
 from aiida.orm import Data
 from aiida.common.exceptions import PluginInternalError, ValidationError, ParsingError
-from aiida.backends.djsite.db import models
 
-_RE_FLAGS = re.M | re.X
+from .utils import write_cp2k_gpp_to_file, cp2k_gpp_file_iter
+
+def _li_round(li, prec=6):
+    if isinstance(li, float):
+        return round(li, prec)
+
+    if isinstance(li, list):
+        return type(li)(_li_round(x, prec) for x in li)
+
+    return li
 
 
 class GaussianpseudoData(Data):
@@ -43,8 +49,7 @@ class GaussianpseudoData(Data):
     def _init_internal_params(self):
         self._updatable_attributes = ['default']
 
-    @classmethod
-    def create_if_not_existing(cls, gpp_data):
+    def __init__(self, gpp_data):
         """
         Create a gpp from dictionary and store it in database if does not exist.
         If user tries to store a new gpp under an already existing id, a
@@ -253,14 +258,14 @@ class GaussianpseudoData(Data):
         self_dict.pop('default', None)
         other_dict.pop('version', None)
         other_dict.pop('default', None)
-        self_vals = _li_round(_dict_to_list(self_dict))
-        other_vals = _li_round(_dict_to_list(other_dict))
+        self_vals = _li_round(sorted(self_dict.items()))
+        other_vals = _li_round(sorted(other_dict.items()))
         return self_vals == other_vals
 
     @classmethod
-    def upload_cp2k_gpp_file(cls, filename):
+    def from_cp2k(cls, fhandle):
         """
-        Upload a number of gpp's in CP2K format contained in a single file.
+        Upload a gpp's in CP2K format contained in a single file.
         If a gpp already exists, it is not uploaded.
         If a different gpp exists under the same name or alias, an
         UniquenessError is thrown.
@@ -299,201 +304,17 @@ class GaussianpseudoData(Data):
         the compatible xc-functional (e.g. PBE) and 'nval' the total number
         of valence electrons.
         """
-        gpp_file = open(filename).read()
-        gpp_iter = _CP2KGPP_REGEX.finditer(gpp_file)
-        uploaded = [cls.create_if_not_existing(_parse_single_cp2k_gpp(match))
-                    for match in gpp_iter]
+        
+        uploaded = [cls.create_if_not_existing(gpp) for gpp in cp2k_gpp_file_iter(fhandle)]
         n_gpp = len(uploaded)
         n_uploaded = n_gpp - uploaded.count(None)
         return n_gpp, n_uploaded
 
-    def write_cp2k_gpp_to_file(self, filename, mode='w'):
+    def to_cp2k(self, fhandle):
         """
         Write a gpp instance to file in CP2K format.
-        :param filename: filename
+        :param filename: open file handle
         :param mode: mode argument of built-in open function ('a' or 'w')
         """
-
-        ffp = lambda fp: "{0:.8f}".format(fp).rjust(15)
-        fitg = lambda itg: str(itg).rjust(5)
-
         gpp_data = dict(self.iterattrs())
-
-        f = open(filename, mode)
-        f.write(gpp_data['element'])
-        for _ in gpp_data['id']:
-            f.write(' ' + _)
-        f.write('\n')
-        for n_elec in gpp_data['n_elec']:
-            f.write(fitg(n_elec))
-        f.write('\n')
-        f.write(ffp(gpp_data['r_loc']))
-        f.write(fitg(gpp_data['nexp_ppl']))
-        for cexp in gpp_data['cexp_ppl']:
-            f.write(ffp(cexp))
-        f.write('\n')
-        f.write(fitg(gpp_data['nprj']))
-        if gpp_data['nprj'] > 0:
-            f.write('\n')
-        for i in range(gpp_data['nprj']):
-            f.write(ffp(gpp_data['r'][i]) + fitg(gpp_data['nprj_ppnl'][i]))
-            nwrite = gpp_data['nprj_ppnl'][i]
-            hprj = iter(gpp_data['hprj_ppnl'][i])
-            n_intend = 0
-            while nwrite > 0:
-                for _ in range(nwrite):
-                    f.write(ffp(hprj.next()))
-                f.write('\n')
-                n_intend += 1
-                nwrite = nwrite - 1
-                if nwrite > 0:
-                    f.write(' ' * 20 + ' ' * 15 * n_intend)
-        f.write('\n\n')
-        f.close()
-
-    def get_full_type(self):
-        return "{}-{}-q{}".format(self.get_attr("gpp_type"),
-                                  self.get_attr("xc")[0], self.get_attr("n_val"))
-
-
-def _dict_to_list(di):
-    li = [[k, v] for k, v in di.items()]
-    li.sort()
-    return li
-
-
-def _li_round(li, prec=6):
-    if isinstance(li, float):
-        return round(li, prec)
-    elif isinstance(li, list):
-        return type(li)(_li_round(x, prec) for x in li)
-    else:
-        return li
-
-
-_CP2KGPP_REGEX = re.compile(r"""
-    # Element symbol  Name of the potential  Alias names
-        (?P<element>
-            [A-Z][a-z]{0,1}
-        )
-        (?P<name>
-            ([ \t\r\f\v]+[-\w]+)+
-        )
-        [ \t\r\f\v]*[\n]
-    # n_elec(s)  n_elec(p)  n_elec(d)  ...
-        (?P<el_config>
-            ([ \t\r\f\v]*[0-9]+)+
-        )
-        [ \t\r\f\v]*[\n]
-    # r_loc   nexp_ppl        cexp_ppl(1) ... cexp_ppl(nexp_ppl)
-        (?P<body_loc>
-            [ \t\r\f\v]*[\d\.]+[ \t\r\f\v]*[\d]+([ \t\r\f\v]+-?[\d]+.[\d]+)*
-        )
-        [ \t\r\f\v]*[\n]
-    # nprj
-        (?P<nproj_nonloc>
-            [ \t\r\f\v]*[\d]+
-        )
-        [ \t\r\f\v]*[\n]
-    # r(1)    nprj_ppnl(1)    ((hprj_ppnl(1,i,j),j=i,nprj_ppnl(1)),i=1,nprj_ppnl(1))
-    # r(2)    nprj_ppnl(2)    ((hprj_ppnl(2,i,j),j=i,nprj_ppnl(2)),i=1,nprj_ppnl(2))
-    #  .       .               .
-    #  .       .               .
-    #  .       .               .
-    # r(nprj) nprj_ppnl(nprj) ((hprj_ppnl(nprj,i,j),j=i,nprj_ppnl(nprj)),
-        (?P<body_nonloc>
-            ([ \t\r\f\v]*[\d\.]+[ \t\r\f\v]*[\d]+(([ \t\r\f\v]+-?[\d]+.[\d]+)+
-                [ \t\r\f\v]*[\n])*)*
-        )
-    """, _RE_FLAGS)
-
-
-def _parse_single_cp2k_gpp(match):
-    element = match.group('element').strip(' \t\r\f\v\n')
-    names = match.group('name').strip(' \t\r\f\v\n').split()
-    print("parsing", element, ", ".join(names))
-
-    n_elec = [int(el) for el in (match.group('el_config').strip(
-        ' \t\r\f\v\n').split())]
-    body_loc = match.group('body_loc').strip(' \t\r\f\v\n').split()
-    nprj = int(match.group('nproj_nonloc').strip(' \t\r\f\v\n'))
-    body_nonloc = match.group('body_nonloc').strip(' \t\r\f\v\n')
-
-    r_loc = float(body_loc[0])
-    nexp_ppl = int(body_loc[1])
-    cexp_ppl = []
-    for val in body_loc[2:]:
-        cexp_ppl.append(float(val))
-    next_proj = True
-    n = 0
-    r = []
-    nprj_ppnl = []
-    hprj_ppnl = []
-    for line in body_nonloc.splitlines():
-        line = line.split()
-        offset = 0
-        if next_proj:
-            hprj_ppnl.append([])
-            r.append(float(line[offset]))
-            nprj_ppnl.append(int(line[offset + 1]))
-            nhproj = nprj_ppnl[-1] * (nprj_ppnl[-1] + 1) / 2
-            offset = 2
-        for data in line[offset:]:
-            hprj_ppnl[n].append(float(data))
-        next_proj = len(hprj_ppnl[n]) == nhproj
-        if next_proj:
-            n = n + 1
-
-    namessp = [_.split('-') for _ in names]
-
-    parse_name = any(len(_) > 1 for _ in namessp)
-
-    gpp_type = [_[0] for _ in namessp if len(_) >= 1]
-    xc = [_[1] for _ in namessp if len(_) >= 2]
-    n_val = [_[2] for _ in namessp if len(_) >= 3]
-
-    xc = list(set(xc))
-    unique_type = list(set(gpp_type))
-    if not n_val:
-        n_val = [str(sum(n_elec))]
-    unique_n_val = list(set(n_val))
-
-    data_to_store = ('element', 'gpp_type', 'xc', 'n_elec', 'r_loc',
-                     'nexp_ppl', 'cexp_ppl', 'nprj', 'r', 'nprj_ppnl',
-                     'hprj_ppnl')
-    gpp_data = {}
-    for _ in data_to_store:
-        gpp_data[_] = locals()[_]
-
-    if parse_name:
-        if len(unique_type) == 1 and len(unique_n_val) == 1:
-            gpp_type = unique_type[0]
-            n_val = unique_n_val[0]
-        else:
-            raise ParsingError(
-                'gpp_type and n_val in pseudo name gpp_type-xc-n_val must be '
-                'unique')
-
-        try:
-            n_val = int(n_val.lstrip('q'))
-        except ValueError:
-            raise ValueError(
-                'pseudo potential name should be "type-xc-q<nval>" with nval the number of valence electrons.')
-
-        gpp_data['id'] = ['{}-{}-q{}'.format(gpp_type, _, n_val)
-                          for _ in gpp_data['xc']]
-        gpp_data['gpp_type'] = gpp_type
-        gpp_data['n_val'] = n_val
-        gpp_data['xc'] = xc
-
-        if n_val != sum(n_elec):
-            raise ParsingError(
-                'number of valence electron must be sum of occupancy')
-
-    else:
-        gpp_data['id'] = names
-        gpp_data['gpp_type'] = ''
-        gpp_data['n_val'] = ''
-        gpp_data['xc'] = []
-
-    return gpp_data
+        write_cp2k_gpp_to_file(gpp_data)
