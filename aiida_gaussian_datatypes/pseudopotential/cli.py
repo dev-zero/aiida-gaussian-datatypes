@@ -23,20 +23,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-import sys
-
 import click
+import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
+
+from ..utils import click_parse_range
 
 
 SUPPORTED_OUTPUT_FORMATS = ['cp2k', ]  # other candidates: 'Abinit', ...
 
 
+def _formatted_table(pseudos):
+    """generates a formatted table (using tabulate) for the given list of Pseudopotentials"""
+
+    def names_column(name, aliases):
+        return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
+
+    table_content = [(n+1, p.element, names_column(p.name, p.aliases), ', '.join(p.tags), ', '.join(str(n) for n in p.n_el), p.version)
+                     for n, p in enumerate(pseudos)]
+    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Valence e⁻ (s, p, d)', 'Version'])
+
+
 @verdi_data.group('gaussian.pseudo')
 def cli():
-    """Manage pseudopotentials for GTO-based codes"""
+    """Manage Pseudopotentials for GTO-based codes"""
     pass
 
 
@@ -56,84 +68,83 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
     Add a pseudopotential from a file to the database
     """
 
-    from aiida_gaussian_datatypes.basisset.data import PseudoPotential
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
 
     loaders = {
-        "cp2k": PseudoPotential.from_cp2k,
+        "cp2k": Pseudopotential.from_cp2k,
         }
 
-    pseudo = loaders[fformat](basisset_file)
+    pseudos = loaders[fformat](pseudopotential_file)
 
-    click.confirm("Add a Pseudopotential for '{b.element}' from '{b.id}'?".format(b=pseudo), abort=True)
+    if not pseudos:
+        echo.echo_info("No valid Gaussian Pseudopotentials found in the given file matching the given criteria")
+        return
 
-    pseudo.store()
+    if len(pseudos) == 1:
+        pseudo = pseudos[0]
+        click.confirm("Add a Gaussian '{p.gpp_type}' Pseudopotential for '{p.element}'?".format(p=pseudo), abort=True)
+        pseudo.store()
+        return
+
+    echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
+    echo.echo(_formatted_table(pseudos))
+    echo.echo("")
+
+    indexes = click.prompt("Which Gaussian Pseudopotentials do you want to add?"
+                           " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
+                           value_proc=lambda v: click_parse_range(v, len(pseudos)))
+
+    for idx in indexes:
+        echo.echo_info("Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]), nl=False)
+        pseudos[idx].store()
+        echo.echo("DONE")
 
 
-
-@cli.command()
+@cli.command('list')
 @decorators.with_dbenv()
-@click.argument('filename', type=click.Path(exists=True))
-def upload(filename):
-    """
-    Upload all pseudopotentials in a file.
-    If a pseudo already exists, it is not uploaded.
-    Returns the number of pseudos found and the number of uploaded pseudos.
-    """
-
-    from aiida_gaussian_datatypes.data.pseudopotential import PseudoPotential as gpp
-    n_gpp, n_uploaded = gpp.upload_cp2k_gpp_file(filename)
-    echo.echo("Number of pseudos found: {}. Number of new pseudos uploaded: {}".format(n_gpp, n_uploaded))
-
-
-@cli.command()
-@decorators.with_dbenv()
-@click.option('-e', '--element', type=str, default=None, help="Element (e.g. H)")
+@click.option('-s', '--sym', type=str, default=None, help="filter by atomic symbol")
 @click.option('ptype', '-t', '--type', type=str, default=None, help="Name or classification (e.g. GTH)")
-@click.option('-x', '--xcfct', type=str, default=None, help="Associated xc functional (e.g. PBE)")
+@click.option('-x', '--xcfunc', type=str, default=None, help="Associated XC functional (e.g. PBE)")
 @click.option('-n', '--nval', type=int, default=None, help="Number of valence electrons (e.g. 1)")
-@click.option('-v', '--version', type=int, default=None, help="specific version")
+@click.option('-v', '--version', type=int, default=None, help="Specific version")
 @click.option('-d', '--default', type=bool, default=True,
               help="show only default pseudos (newest version)", show_default=True)
-def list(element, ptype, xcfct, nval, version, default):
+def list_pseudos(sym, ptype, xcfunc, nval, version, default):
     """
-    List AiiDa Gaussian pseudopotentials filtered with optional criteria.
+    List Gaussian Pseudopotentials
     """
-    from aiida.orm import DataFactory
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
+    from aiida.orm.querybuilder import QueryBuilder
 
-    pseudo = DataFactory('gaussian.pseudo')
-    pseudos = pseudo.get_pseudos(
-        element=element,
-        gpp_type=ptype,
-        xc=xcfct,
-        n_val=nval,
-        version=version,
-        default=default)
+    query = QueryBuilder()
+    query.append(Pseudopotential)
 
-    row_format_header = "  {:<10} {:<15} {:<20} {:<10} {:<40} {:<10}"
-    row_format = '* {:<10} {:<15} {:<20} {:<10} {:<40} {:<10}'
-    echo.echo(row_format_header.format("atom type", "pseudo type", "xc functional", "num. el.", "ID", "version"))
-    for pseudo in pseudos:
-        pseudo_data = dict(pseudo.iterattrs())
+    if sym:
+        query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
 
-        echo.echo(row_format.format(
-            pseudo_data['element'],
-            pseudo_data['gpp_type'],
-            pseudo_data['xc'][0] if pseudo_data['xc'] else '',
-            pseudo_data['n_val'],
-            pseudo_data['id'][0],
-            pseudo_data['version'][0]))
+    if ptype:
+        query.add_filter(Pseudopotential, {'attributes.gpp_ptype': {'==': ptype}})
 
-        for i in range(1, len(pseudo_data['id'])):
-            echo.echo(row_format.format(
-                '',
-                '(alias)',
-                pseudo_data['xc'][i] if pseudo_data['xc'] else '',
-                '',
-                pseudo_data['id'][i],
-                pseudo_data['version'][i]))
+    if xcfunc:
+        pass
+        #query.add_filter(Pseudopotential, {'attributes.element': {'startswith': ptype}})
+
+    if nval:
+        pass
+
+    if version:
+        pass
+
+    if not query.count():
+        echo.echo("No Gaussian Pseudopotential found.")
+        return
+
+    echo.echo_info("{} Gaussian Pseudopotential found:\n".format(query.count()))
+    echo.echo(_formatted_table([pseudo for [pseudo] in query.iterall()]))
+    echo.echo("")
 
 
-@cli.command()
+@cli.command('dump')
 @decorators.with_dbenv()
 @click.argument('filename', type=click.Path(exists=False), required=True)
 @click.option('-e', '--element', type=str, default=None, help="Element (e.g. H)")
@@ -143,9 +154,9 @@ def list(element, ptype, xcfct, nval, version, default):
 @click.option('-v', '--version', type=int, default=None, help="specific version")
 @click.option('-d', '--default', type=bool, default=True,
               help="show only default pseudos (newest version)", show_default=True)
-def dump(filename, element, ptype, xcfct, nval, version, default):
+def dump_pseudo(filename, element, ptype, xcfct, nval, version, default):
     """
-    Export AiiDa Gaussian pseudopotentials filtered with optional criteria to file.
+    Export AiiDa Gaussian Pseudopotential filtered with optional criteria to file.
     """
 
     from aiida.orm import DataFactory
