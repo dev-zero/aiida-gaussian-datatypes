@@ -93,7 +93,7 @@ def parse_single_cp2k_basisset(basis):
     :return:      A dictionary containing the element, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
-    # the first line contains the element and one or more idientifiers/names
+    # the first line contains the element and one or more identifiers/names
     identifiers = basis[0].split()
     element = identifiers.pop(0)
 
