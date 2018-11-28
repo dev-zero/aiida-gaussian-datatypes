@@ -31,6 +31,8 @@ import tabulate
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
 
+from ..utils import click_parse_range
+
 
 def _formatted_table(bsets):
     """generates a formatted table (using tabulate) for the given list of basis sets"""
@@ -92,36 +94,9 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
     echo.echo(_formatted_table(bsets))
     echo.echo("")
 
-    def parse_range(value):
-        """value_proc function to convert the given input to a list of indexes"""
-        if value.startswith('a'):
-            return range(len(bsets))
-
-        if value.startswith('n'):
-            return []
-
-        indexes = []
-
-        try:
-            for spec in value.replace(' \t', '').split(','):
-                try:
-                    begin, end = spec.split('-')
-                except ValueError:
-                    indexes.append(int(spec) - 1)
-                else:
-                    indexes += list(range(int(begin) - 1, int(end)))
-
-        except ValueError:
-            raise click.BadParameter("Invalid range or value specified", param=value)
-
-        if max(indexes) >= len(bsets):
-            raise click.BadParameter("Specified index is out of range", param=max(indexes))
-
-        return sorted(set(indexes))
-
     indexes = click.prompt("Which Gaussian Basis Set do you want to add?"
                            " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
-                           value_proc=parse_range)
+                           value_proc=lambda v: click_parse_range(v, len(pseudos)))
 
     for idx in indexes:
         echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
