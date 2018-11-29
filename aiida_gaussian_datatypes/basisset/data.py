@@ -23,9 +23,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from __future__ import absolute_import
-
 from aiida.orm.data import Data
+from aiida.common.exceptions import ValidationError
 
 from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
 
@@ -49,8 +48,6 @@ class BasisSet(Data):
 
         if 'dbnode' in kwargs:
             return  # node was loaded from database
-
-        # TODO: check format
 
         self._set_attr('name', name)
         self._set_attr('element', element)
@@ -77,6 +74,31 @@ class BasisSet(Data):
                 .format(uuid=existing.uuid, b=self))
 
         return super(BasisSet, self).store(*args, **kwargs)
+
+    def _validate(self):
+        super(BasisSet, self)._validate()
+
+        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Length
+
+        schema = Schema({
+            'name': str,
+            'element': str,
+            'tags': [str],
+            'aliases': [str],
+            'blocks': [{
+                "n": int,
+                "l": [All([int], Length(2, 2)), All((int,), Length(2, 2))],
+                "coefficients": [[float]],
+                }],
+            'version': int,
+            }, extra=ALLOW_EXTRA, required=True)
+
+        data = dict(self.iterattrs())
+        try:
+            schema(data)
+        except MultipleInvalid as exc:
+            raise ValidationError(str(exc))
+
 
     @classmethod
     def get(cls, element, name=None, version='latest', match_aliases=True):
@@ -219,7 +241,7 @@ class BasisSet(Data):
                         (0, 2),  # 2 sets of coefficients for the same exponents for s
                         (1, 1),  # 1 set of coefficients for the same exponents for p
                         ],
-                    "blocks":
+                    "coefficients":
                         [
                             [ "2838.2104843030", "-0.0007019523",  "-0.0007019523", "-0.0007019523" ],
                             [  "425.9069835160", "-0.0054237190",  "-0.0054237190", "-0.0054237190" ],

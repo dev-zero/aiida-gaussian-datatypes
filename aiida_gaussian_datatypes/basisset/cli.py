@@ -96,7 +96,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
 
     indexes = click.prompt("Which Gaussian Basis Set do you want to add?"
                            " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
-                           value_proc=lambda v: click_parse_range(v, len(pseudos)))
+                           value_proc=lambda v: click_parse_range(v, len(bsets)))
 
     for idx in indexes:
         echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
