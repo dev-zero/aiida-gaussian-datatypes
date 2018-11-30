@@ -114,7 +114,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
 @decorators.with_dbenv()
 def list_basisset(sym, name, tags):
     """
-    List installed gaussian basis sets
+    List Gaussian Basis Sets
     """
 
     from aiida_gaussian_datatypes.basisset.data import BasisSet

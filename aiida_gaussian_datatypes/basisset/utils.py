@@ -35,6 +35,10 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:
     Write the Basis Set to the passed file handle in the format expected by CP2K.
 
     :param fhandle: A valid output file handle
+    :param element: Atomic symbol of the passed-in data
+    :param name: Name for this entry
+    :param blocks: The actual basis set data
+    :param fmts: Tuple of Python format strings, the first one for the exponents, the second for the coefficients
     """
 
     fhandle.write("{} {}\n".format(element, name))

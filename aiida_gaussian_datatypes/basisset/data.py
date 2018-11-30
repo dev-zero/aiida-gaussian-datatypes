@@ -93,12 +93,82 @@ class BasisSet(Data):
             'version': int,
             }, extra=ALLOW_EXTRA, required=True)
 
-        data = dict(self.iterattrs())
         try:
-            schema(data)
+            schema(dict(self.iterattrs()))
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
+    @property
+    def element(self):
+        """
+        the atomic kind/element this basis set is for
+
+        :rtype: str
+        """
+        return self.get_attr('element', None)
+
+    @property
+    def name(self):
+        """
+        the name for this basis set
+
+        :rtype: str
+        """
+        return self.get_attr('name', None)
+
+    @property
+    def aliases(self):
+        """
+        a list of alternative names
+
+        :rtype: []
+        """
+        return self.get_attr('aliases', [])
+
+    @property
+    def tags(self):
+        """
+        a list of tags
+
+        :rtype: []
+        """
+        return self.get_attr('tags', [])
+
+    @property
+    def version(self):
+        """
+        the version of this basis set
+
+        :rtype: int
+        """
+        return self.get_attr('version', None)
+
+    @property
+    def blocks(self):
+        """
+        Return the shells/blocks in the following format::
+
+            [
+                {
+                    "n": 2,
+                    "l": [
+                        (0, 2),  # 2 sets of coefficients for the same exponents for s
+                        (1, 1),  # 1 set of coefficients for the same exponents for p
+                        ],
+                    "coefficients":
+                        [
+                            [ "2838.2104843030", "-0.0007019523",  "-0.0007019523", "-0.0007019523" ],
+                            [  "425.9069835160", "-0.0054237190",  "-0.0054237190", "-0.0054237190" ],
+                            [   "96.6806600316", "-0.0277505669",  "-0.0277505669", "-0.0277505669" ],
+                        ],
+                    ],
+                },
+            ]
+
+        :rtype: []
+        """
+
+        return self.get_attr('blocks', [])
 
     @classmethod
     def get(cls, element, name=None, version='latest', match_aliases=True):
@@ -183,78 +253,6 @@ class BasisSet(Data):
             raise ValueError("Specified duplicate handling strategy not recognized: '{}'".format(duplicate_handling))
 
         return [cls(**bs) for bs in bsets]
-
-    @property
-    def element(self):
-        """
-        the atomic kind/element this basis set is for
-
-        :rtype: str
-        """
-        return self.get_attr('element', None)
-
-    @property
-    def name(self):
-        """
-        the name for this basis set
-
-        :rtype: str
-        """
-        return self.get_attr('name', None)
-
-    @property
-    def aliases(self):
-        """
-        a list of alternative names
-
-        :rtype: []
-        """
-        return self.get_attr('aliases', [])
-
-    @property
-    def tags(self):
-        """
-        a list of tags
-
-        :rtype: []
-        """
-        return self.get_attr('tags', [])
-
-    @property
-    def version(self):
-        """
-        the version of this basis set
-
-        :rtype: int
-        """
-        return self.get_attr('version', None)
-
-    @property
-    def blocks(self):
-        """
-        Return the shells/blocks in the following format::
-
-            [
-                {
-                    "n": 2,
-                    "l": [
-                        (0, 2),  # 2 sets of coefficients for the same exponents for s
-                        (1, 1),  # 1 set of coefficients for the same exponents for p
-                        ],
-                    "coefficients":
-                        [
-                            [ "2838.2104843030", "-0.0007019523",  "-0.0007019523", "-0.0007019523" ],
-                            [  "425.9069835160", "-0.0054237190",  "-0.0054237190", "-0.0054237190" ],
-                            [   "96.6806600316", "-0.0277505669",  "-0.0277505669", "-0.0277505669" ],
-                        ],
-                    ],
-                },
-            ]
-
-        :rtype: []
-        """
-
-        return self.get_attr('blocks', [])
 
     def to_cp2k(self, fhandle):
         """
