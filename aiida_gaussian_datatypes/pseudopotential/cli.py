@@ -74,7 +74,12 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
         "cp2k": Pseudopotential.from_cp2k,
         }
 
-    pseudos = loaders[fformat](pseudopotential_file)
+    filters = {
+        'element': lambda x: not sym or x == sym,
+        'tags': lambda x: not tags or set(tags).issubset(x),
+        }
+
+    pseudos = loaders[fformat](pseudopotential_file, filters, duplicates)
 
     if not pseudos:
         echo.echo_info("No valid Gaussian Pseudopotentials found in the given file matching the given criteria")

@@ -28,16 +28,6 @@ from aiida.common.exceptions import ValidationError
 from .utils import write_cp2k_pseudo_to_file, cp2k_pseudo_file_iter
 
 
-def _li_round(li, prec=6):
-    if isinstance(li, float):
-        return round(li, prec)
-
-    if isinstance(li, list):
-        return type(li)(_li_round(x, prec) for x in li)
-
-    return li
-
-
 class Pseudopotential(Data):
     """
     Gaussian Pseudopotential (gpp) class to store gpp's in database and retrieve them.
@@ -64,6 +54,25 @@ class Pseudopotential(Data):
         self._set_attr('non_local', non_local)
         self._set_attr('version', version)
 
+    def store(self, *args, **kwargs):
+        """
+        Store the node, ensuring that the combination (element,name,version) is unique.
+        """
+        # TODO: this uniqueness check is not race-condition free.
+
+        from aiida.common.exceptions import UniquenessError, NotExistent
+
+        try:
+            existing = self.get(self.element, self.name, self.version, match_aliases=False)
+        except NotExistent:
+            pass
+        else:
+            raise UniquenessError("Gaussian Pseudopotential already exists for"
+                                  " element={b.element}, name={b.name}, version={b.version}: {uuid}"
+                                  .format(uuid=existing.uuid, b=self))
+
+        return super(Pseudopotential, self).store(*args, **kwargs)
+
     def _validate(self):
         super(Pseudopotential, self)._validate()
 
@@ -85,7 +94,7 @@ class Pseudopotential(Data):
                 'coeffs': [float],
                 }],
             'version': int,
-            }, extra=ALLOW_EXTRA, required=True) 
+            }, extra=ALLOW_EXTRA, required=True)
         try:
             schema(dict(self.iterattrs()))
         except MultipleInvalid as exc:
@@ -163,7 +172,6 @@ class Pseudopotential(Data):
         """
         return self.get_attr('local', None)
 
-
     @property
     def non_local(self):
         """
@@ -179,51 +187,90 @@ class Pseudopotential(Data):
         """
         return self.get_attr('non_local', [])
 
+    @classmethod
+    def get(cls, element, name=None, version='latest', match_aliases=True):
+        from aiida.orm.querybuilder import QueryBuilder
+        from aiida.common.exceptions import NotExistent
+
+        filters = {
+            'attributes.element': {'==': element},
+            }
+
+        if version != 'latest':
+            filters['attributes.version'] = {'==': version}
+
+        if match_aliases:
+            filters['attributes.aliases'] = {'contains': [name]}
+        else:
+            filters['attributes.name'] = {'==': name}
+
+        query = QueryBuilder()
+        query.append(Pseudopotential)
+        query.add_filter(Pseudopotential, filters)
+        query.order_by({Pseudopotential: [{'attributes.version': {'cast': 'i', 'order': 'desc'}}]})
+
+        existing = query.first()
+
+        if not existing:
+            raise NotExistent("No Gaussian Pseudopotential found for"
+                              " element={element}, name={name}, version={version}"
+                              .format(element=element, name=name, version=version))
+
+        return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle):
+    def from_cp2k(cls, fhandle, filters, duplicate_handling='ignore'):
         """
-        Upload a gpp's in CP2K format contained in a single file.
-        If a gpp already exists, it is not uploaded.
-        If a different gpp exists under the same name or alias, an
-        UniquenessError is thrown.
-        :return: number of gpp's in file, number of uploaded gpp's.
-        Docu of format from GTH_POTENTIALS file of CP2K:
-        ------------------------------------------------------------------------
-        GTH-potential format:
+        Constructs a list with pseudopotential objects from a Pseudopotential in CP2K format
 
-        Element symbol  Name of the potential  Alias names
-        n_el(s)  n_el(p)  n_el(d)  ...
-        r_loc   nexp_ppl        cexp_ppl(1) ... cexp_ppl(nexp_ppl)
-        nprj
-        r(1)    nprj_ppnl(1)    ((hprj_ppnl(1,i,j),j=i,nprj_ppnl(1)),i=1,nprj_ppnl(1))
-        r(2)    nprj_ppnl(2)    ((hprj_ppnl(2,i,j),j=i,nprj_ppnl(2)),i=1,nprj_ppnl(2))
-         .       .               .
-         .       .               .
-         .       .               .
-        r(nprj) nprj_ppnl(nprj) ((hprj_ppnl(nprj,i,j),j=i,nprj_ppnl(nprj)),
-                                                      i=1,nprj_ppnl(nprj))
-
-        n_el   : Number of electrons for each angular momentum quantum number
-                   (electronic configuration -> s p d ...)
-        r_loc    : Radius for the local part defined by the Gaussian function
-                   exponent alpha_erf
-        nexp_ppl : Number of the local pseudopotential functions
-        cexp_ppl : Coefficients of the local pseudopotential functions
-        nprj     : Number of the non-local projectors => nprj = SIZE(nprj_ppnl(:))
-        r        : Radius of the non-local part for angular momentum quantum number l
-                   defined by the Gaussian function exponents alpha_prj_ppnl
-        nprj_ppnl: Number of the non-local projectors for the angular momentum
-                   quantum number l
-        hprj_ppnl: Coefficients of the non-local projector functions
-        ------------------------------------------------------------------------
-        Name and Alias of the potentials are required to be of the format
-        'type'-'xc'-q'nval' with 'type' some classification (e.g. GTH), 'xc'
-        the compatible xc-functional (e.g. PBE) and 'nval' the total number
-        of valence electrons.
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
         """
 
-        return [Pseudopotential(**pseudo_data) for pseudo_data in cp2k_pseudo_file_iter(fhandle)]
+        from aiida.common.exceptions import UniquenessError, NotExistent
+
+        def matches_criteria(pseudo):
+            return all(fspec(pseudo[field]) for field, fspec in filters.items())
+
+        def exists(pseudo):
+            try:
+                cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle) if matches_criteria(p)]
+
+        if duplicate_handling == 'ignore':  # simply filter duplicates
+            pseudos = [p for p in pseudos if not exists(p)]
+
+        elif duplicate_handling == 'error':
+            for pseudo in pseudos:
+                try:
+                    latest = cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    raise UniquenessError("Gaussian Pseudopotential already exists for"
+                                          " element={element}, name={name}: {uuid}"
+                                          .format(uuid=latest.uuid, **pseudo))
+
+        elif duplicate_handling == 'new':
+            for pseudo in pseudos:
+                try:
+                    latest = cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    pseudo['version'] = latest.version + 1
+
+        else:
+            raise ValueError("Specified duplicate handling strategy not recognized: '{}'".format(duplicate_handling))
+
+        return [cls(**p) for p in pseudos]
 
     def to_cp2k(self, fhandle):
         """
