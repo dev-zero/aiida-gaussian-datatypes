@@ -142,12 +142,16 @@ def list_basisset(sym, name, tags):
 
 
 @cli.command('dump')
-@click.option('-e', '--elements', type=str, default=None,
-              help=("Filter the families only to those containing a basis set for each of the specified elements"))
+@click.option('-s', '--sym', type=str, default=None,
+              help="filter by a specific element")
+@click.option('-n', '--name', type=str, default=None,
+              help="filter by name")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
               help="Chose the output format for the basiset: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
-def dump_basisset(elements, output_format):
+def dump_basisset(sym, name, tags, output_format):
     """
     Print specified Basis Sets
     """
@@ -163,8 +167,14 @@ def dump_basisset(elements, output_format):
     query.append(BasisSet,
                  project=['uuid', 'attributes.id', 'attributes.element', '*'])
 
-    if elements is not None:
-        query.add_filter(BasisSet, {'attributes.element': {'in': elements}})
+    if sym:
+        query.add_filter(BasisSet, {'attributes.element': {'==': sym}})
+
+    if name:
+        query.add_filter(BasisSet, {'attributes.aliases': {'contains': [name]}})
+
+    if tags:
+        query.add_filter(BasisSet, {'attributes.tags': {'contains': tags}})
 
     if not query.count():
         echo.echo_warning("No Gaussian Basis Sets found.", err=echo.is_stdout_redirected())

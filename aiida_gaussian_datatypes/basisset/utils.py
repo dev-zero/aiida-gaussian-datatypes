@@ -30,7 +30,7 @@ EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
 BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
 
 
-def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:> #14.12f}")):
+def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f")):
     """
     Write the Basis Set to the passed file handle in the format expected by CP2K.
 
@@ -41,8 +41,10 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:
     :param fmts: Tuple of Python format strings, the first one for the exponents, the second for the coefficients
     """
 
-    fhandle.write("{} {}\n".format(element, name))
-    fhandle.write("{}\n".format(len(blocks)))  # the number of sets this basis set contains
+    fhandle.write(
+        f"{element} {name}\n"
+        f"{len(blocks)}\n"  # the number of sets this basis set contains
+        )
 
     e_fmt, c_fmt = fmts
 
@@ -54,10 +56,12 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=("{:>#18.12f}", "{:
         fhandle.write("\n")
 
         for row in block['coefficients']:
-            fhandle.write(e_fmt.format(row[0]))
+            fhandle.write(f"{row[0]:{e_fmt}}")
             fhandle.write(" ")
-            fhandle.write(" ".join(c_fmt.format(f) for f in row[1:]))
+            fhandle.write(" ".join(f"{f:{c_fmt}}" for f in row[1:]))
             fhandle.write("\n")
+
+    fhandle.write("#\n")
 
 
 def cp2k_basisset_file_iter(fhandle):
