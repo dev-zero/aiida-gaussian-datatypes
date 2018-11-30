@@ -2,30 +2,31 @@
 """
 Gaussian Pseudo Potential
 
-Provides a general framework for storing and querying gaussian pseudopotentials (GPP's).
-Read and write functionality for CP2K format provided.
+Copyright (c), 2018 Tiziano Müller
 
-Copyright (c), 2017 The Gaussian Datatypes Authors (see AUTHORS.txt)
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and
-to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-The above copyright notice and this permission notice shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
-CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 """
 
-from aiida.orm import Data
+from aiida.orm.data import Data
 from aiida.common.exceptions import ValidationError
 
-from .utils import write_cp2k_pseudo_to_file, cp2k_pseudo_file_iter
+from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
 
 class Pseudopotential(Data):
@@ -95,12 +96,15 @@ class Pseudopotential(Data):
                 }],
             'version': int,
             }, extra=ALLOW_EXTRA, required=True)
+
+        data = dict(self.iterattrs())
+
         try:
-            schema(dict(self.iterattrs()))
+            schema(data)
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
-        for nl in self.non_local:
+        for nl in data['non_local']:
             if len(nl['coeffs']) != nl['nproj']*(nl['nproj']+1) // 2:
                 raise ValidationError("invalid number of coefficients for non-local projection")
 
@@ -274,9 +278,8 @@ class Pseudopotential(Data):
 
     def to_cp2k(self, fhandle):
         """
-        Write a gpp instance to file in CP2K format.
-        :param filename: open file handle
-        :param mode: mode argument of built-in open function ('a' or 'w')
+        Write this Pseudopotential instance to a file in CP2K format.
+
+        :param fhandle: open file handle
         """
-        pseudo_data = dict(self.iterattrs())
-        write_cp2k_pseudo_to_file(pseudo_data)
+        write_cp2k_pseudo(fhandle, self.element, self.name, self.n_el, self.local, self.non_local)

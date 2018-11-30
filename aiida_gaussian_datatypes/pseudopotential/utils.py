@@ -32,11 +32,12 @@ from aiida.common.exceptions import ParsingError
 EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
 BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
 
+
 def cp2k_pseudo_file_iter(fhandle):
     """
     Generates a sequence of dicts, one dict for each pseudopotential found in the given file
 
-    :param fhandle: Open file handle (in text mode) to a basis set file
+    :param fhandle: Open file handle (in text mode) to a pseudopotential file
     """
 
     # find the beginning of a new pseudopotential entry, then
@@ -68,7 +69,7 @@ def parse_single_cp2k_pseudo(lines):
     identifiers = lines[0].split()
     element = identifiers.pop(0)
 
-    # put the longest identifier first: some basis sets specify the number of
+    # put the longest identifier first: some pseudopotential specify the number of
     # valence electrons using <IDENTIFIER>-qN
     identifiers.sort(key=lambda i: -len(i))
 
@@ -133,53 +134,49 @@ def parse_single_cp2k_pseudo(lines):
         }
 
 
-def write_cp2k_pseudo_to_file(pseudo_data, fhandle):
-        """
-        Write a gpp instance to file in CP2K format.
-        :param filename: open file handle
-        :param mode: mode argument of built-in open function ('a' or 'w')
-        """
+def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, fmts=(">#4d", ">#14.8f", "> #14.8f")):
+    """
+    Write a Gaussian Pseudopotential to file in CP2K format.
 
-        def format_float(fnum):
-            return "{0:.8f}".format(fnum).rjust(15)
+    :param fhandle: A valid output file handle
+    :param element: Atomic symbol of the passed-in data
+    :param name: Name for this entry
+    :param n_el: List of number of valence electrons per angular momentum
 
-        def format_int(inum):
-            return str(inum).rjust(5)
+    :param fmts: Tuple of Python format strings: (integers, radii, coefficients)
+    """
 
-        fhandle.write(pseudo_data['element'])
+    i_fmt, r_fmt, c_fmt = fmts
 
-        for p_id in pseudo_data['id']:
-            fhandle.write(' ' + p_id)
-        fhandle.write('\n')
+    fhandle.write(f"{element} {name}\n")
+    fhandle.write(" ".join(f"{i:{i_fmt}}" for i in n_el))
+    fhandle.write("\n")
 
-        for n_el in pseudo_data['n_el']:
-            fhandle.write(format_int(n_el))
-        fhandle.write('\n')
+    fhandle.write(f"{local['r']:{r_fmt}} {len(local['coeffs']):{i_fmt}} ")
+    fhandle.write(" ".join(f"{c:{c_fmt}}" for c in local['coeffs']))
+    fhandle.write("\n")
 
-        fhandle.write(format_float(pseudo_data['r_loc']))
-        fhandle.write(format_int(pseudo_data['nexp_ppl']))
+    fhandle.write(f"{len(non_local):{i_fmt}}\n")
 
-        for cexp in pseudo_data['cexp_ppl']:
-            fhandle.write(format_float(cexp))
-        fhandle.write('\n')
+    single_c_len = len("{0:{c_fmt}}".format(0, c_fmt=c_fmt))
 
-        fhandle.write(format_int(pseudo_data['nprj']))
-        if pseudo_data['nprj'] > 0:
-            fhandle.write('\n')
+    for nl in non_local:
+        r_nproj = f"{nl['r']:{r_fmt}} {nl['nproj']:{i_fmt}} "
+        fhandle.write(r_nproj)
 
-        for radius, nproj, hprj in zip(pseudo_data['r'], pseudo_data['nprj_ppnl'], pseudo_data['hprj_ppnl']):
-            fhandle.write(format_float(radius) + format_int(nproj))
+        nlcoeffs = nl['coeffs']
+        nproj = nl['nproj']
 
-            hprj_iter = iter(hprj)
-            n_indent = 0
+        # print the first N (=nproj) coefficients (first row of the matrix)
+        fhandle.write(" ".join(f"{c:{c_fmt}}" for c in nlcoeffs[:nproj]))
+        fhandle.write("\n")
 
-            for nwrite in reversed(range(nproj, 0, -1)):
-                for _ in range(nwrite):
-                    fhandle.write(format_float(hprj_iter.next()))
-                fhandle.write('\n')
+        # for a non-scalar non-empty matrix, print the rest of the coefficients
+        for nrow in range(1, nl['nproj']):
+            fhandle.write(" "*(len(r_nproj) + nrow*(1 + single_c_len)))
+            scol = nrow*nproj - nrow*(nrow-1)//2
+            ecol = scol + nproj - nrow
+            fhandle.write(" ".join(f"{c:{c_fmt}}" for c in nlcoeffs[scol:ecol]))
+            fhandle.write("\n")
 
-                n_indent += 1
-                if nwrite == 1:
-                    fhandle.write(' ' * 20 + ' ' * 15 * n_indent)
-
-        fhandle.write('\n')
+    fhandle.write("#\n")

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gaussian Basis Set verdi command line interface
+Gaussian Pseudopotential verdi command line interface
 
 Copyright (c), 2018 Tiziano Müller
 
@@ -23,6 +23,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
+import sys
+
 import click
 import tabulate
 
@@ -32,16 +34,13 @@ from aiida.cmdline.utils import decorators, echo
 from ..utils import click_parse_range
 
 
-SUPPORTED_OUTPUT_FORMATS = ['cp2k', ]  # other candidates: 'Abinit', ...
-
-
 def _formatted_table(pseudos):
     """generates a formatted table (using tabulate) for the given list of Pseudopotentials"""
 
     def names_column(name, aliases):
         return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
-    table_content = [(n+1, p.element, names_column(p.name, p.aliases), ', '.join(p.tags), ', '.join(str(n) for n in p.n_el), p.version)
+    table_content = [(n+1, p.element, names_column(p.name, p.aliases), ', '.join(p.tags), ', '.join(f"{n}" for n in p.n_el), p.version)
                      for n, p in enumerate(pseudos)]
     return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Valence e⁻ (s, p, d)', 'Version'])
 
@@ -87,7 +86,7 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
 
     if len(pseudos) == 1:
         pseudo = pseudos[0]
-        click.confirm("Add a Gaussian '{p.gpp_type}' Pseudopotential for '{p.element}'?".format(p=pseudo), abort=True)
+        click.confirm("Add a Gaussian '{p.name}' Pseudopotential for '{p.element}'?".format(p=pseudo), abort=True)
         pseudo.store()
         return
 
@@ -106,15 +105,14 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
 
 
 @cli.command('list')
+@click.option('-s', '--sym', type=str, default=None,
+              help="filter by a specific element")
+@click.option('-n', '--name', type=str, default=None,
+              help="filter by name")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
 @decorators.with_dbenv()
-@click.option('-s', '--sym', type=str, default=None, help="filter by atomic symbol")
-@click.option('ptype', '-t', '--type', type=str, default=None, help="Name or classification (e.g. GTH)")
-@click.option('-x', '--xcfunc', type=str, default=None, help="Associated XC functional (e.g. PBE)")
-@click.option('-n', '--nval', type=int, default=None, help="Number of valence electrons (e.g. 1)")
-@click.option('-v', '--version', type=int, default=None, help="Specific version")
-@click.option('-d', '--default', type=bool, default=True,
-              help="show only default pseudos (newest version)", show_default=True)
-def list_pseudos(sym, ptype, xcfunc, nval, version, default):
+def list_pseudos(sym, name, tags):
     """
     List Gaussian Pseudopotentials
     """
@@ -127,21 +125,14 @@ def list_pseudos(sym, ptype, xcfunc, nval, version, default):
     if sym:
         query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
 
-    if ptype:
-        query.add_filter(Pseudopotential, {'attributes.gpp_ptype': {'==': ptype}})
+    if name:
+        query.add_filter(Pseudopotential, {'attributes.aliases': {'contains': [name]}})
 
-    if xcfunc:
-        pass
-        #query.add_filter(Pseudopotential, {'attributes.element': {'startswith': ptype}})
-
-    if nval:
-        pass
-
-    if version:
-        pass
+    if tags:
+        query.add_filter(Pseudopotential, {'attributes.tags': {'contains': tags}})
 
     if not query.count():
-        echo.echo("No Gaussian Pseudopotential found.")
+        echo.echo("No Gaussian Pseudopotentials found.")
         return
 
     echo.echo_info("{} Gaussian Pseudopotential found:\n".format(query.count()))
@@ -150,30 +141,46 @@ def list_pseudos(sym, ptype, xcfunc, nval, version, default):
 
 
 @cli.command('dump')
+@click.option('-s', '--sym', type=str, default=None,
+              help="filter by a specific element")
+@click.option('-n', '--name', type=str, default=None,
+              help="filter by name")
+@click.option('tags', '--tag', '-t', multiple=True,
+              help="filter by a tag (all tags must be present if specified multiple times)")
+@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
+              help="Chose the output format for the pseudopotentials: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
-@click.argument('filename', type=click.Path(exists=False), required=True)
-@click.option('-e', '--element', type=str, default=None, help="Element (e.g. H)")
-@click.option('ptype', '-t', '--type', type=str, default=None, help="Name or classification (e.g. GTH)")
-@click.option('-x', '--xcfct', type=str, default=None, help="Associated xc functional (e.g. PBE)")
-@click.option('-n', '--nval', type=int, default=None, help="Number of valence electrons (e.g. 1)")
-@click.option('-v', '--version', type=int, default=None, help="specific version")
-@click.option('-d', '--default', type=bool, default=True,
-              help="show only default pseudos (newest version)", show_default=True)
-def dump_pseudo(filename, element, ptype, xcfct, nval, version, default):
+def dump_pseudo(sym, name, tags, output_format):
     """
-    Export AiiDa Gaussian Pseudopotential filtered with optional criteria to file.
+    Print specified Pseudopotential
     """
 
-    from aiida.orm import DataFactory
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
+    from aiida.orm.querybuilder import QueryBuilder
 
-    pseudo = DataFactory('gaussian.pseudo')
-    pseudos = pseudo.get_pseudos(
-        element=element,
-        gpp_type=ptype,
-        xc=xcfct,
-        n_val=nval,
-        version=version,
-        default=default)
+    writers = {
+        "cp2k": Pseudopotential.to_cp2k,
+        }
 
-    for pseudo in pseudos:
-        pseudo.write_cp2k_gpp_to_file(filename, mode='a')
+    query = QueryBuilder()
+    query.append(Pseudopotential,
+                 project=['uuid', 'attributes.id', 'attributes.element', '*'])
+
+    if sym:
+        query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
+
+    if name:
+        query.add_filter(Pseudopotential, {'attributes.aliases': {'contains': [name]}})
+
+    if tags:
+        query.add_filter(Pseudopotential, {'attributes.tags': {'contains': tags}})
+
+    if not query.count():
+        echo.echo_warning("No Gaussian Pseudopotential found.", err=echo.is_stdout_redirected())
+        return
+
+    for uuid, name, element, pseudo in query.iterall():
+        if echo.is_stdout_redirected():
+            echo.echo_info("Dumping {}/{} ({})...".format(name, element, uuid), err=True)
+
+        writers[output_format](pseudo, sys.stdout)
