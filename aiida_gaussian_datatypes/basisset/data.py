@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gaussian Basis Set data object
+Gaussian Basis Set Data Class
 
 Copyright (c), 2018 Tiziano Müller
 

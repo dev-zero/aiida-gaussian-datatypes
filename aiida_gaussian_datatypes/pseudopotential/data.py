@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Gaussian Pseudo Potential
+Gaussian Pseudopotential Data class
 
 Copyright (c), 2018 Tiziano Müller
 
