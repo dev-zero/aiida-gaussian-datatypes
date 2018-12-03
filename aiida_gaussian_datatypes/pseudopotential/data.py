@@ -84,7 +84,7 @@ class Pseudopotential(Data):
             'element': str,
             'tags': [str],
             'aliases': [str],
-            'n_el': list,
+            'n_el': [int],
             'local': {
                 'r': float,
                 'coeffs': [float],
@@ -104,8 +104,8 @@ class Pseudopotential(Data):
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
-        for nl in data['non_local']:
-            if len(nl['coeffs']) != nl['nproj']*(nl['nproj']+1) // 2:
+        for nlocal in data['non_local']:
+            if len(nlocal['coeffs']) != nlocal['nproj']*(nlocal['nproj']+1) // 2:
                 raise ValidationError("invalid number of coefficients for non-local projection")
 
     @property
@@ -193,6 +193,14 @@ class Pseudopotential(Data):
 
     @classmethod
     def get(cls, element, name=None, version='latest', match_aliases=True):
+        """
+        Get the first matching Pseudopotential for the given parameters.
+
+        :param element: The atomic symbol
+        :param name: The name of the pseudo
+        :param version: A specific version (if more than one in the database and not the highest/latest)
+        :param match_aliases: Whether to look in the list of of aliases for a matching name
+        """
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
