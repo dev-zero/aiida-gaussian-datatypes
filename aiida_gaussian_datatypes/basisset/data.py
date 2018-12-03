@@ -34,7 +34,7 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(self, element=None, name=None, aliases=[], tags=[], blocks=[], version=1, **kwargs):
+    def __init__(self, element=None, name=None, aliases=[], tags=[], n_el=None, blocks=[], version=1, **kwargs):
         """
         :param element: string containing the name of the element
         :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
@@ -53,6 +53,7 @@ class BasisSet(Data):
         self._set_attr('element', element)
         self._set_attr('tags', tags)
         self._set_attr('aliases', aliases)
+        self._set_attr('n_el', n_el)
         self._set_attr('blocks', blocks)
         self._set_attr('version', version)
 
@@ -78,13 +79,14 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Length
+        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Any, Length
 
         schema = Schema({
             'name': str,
             'element': str,
             'tags': [str],
             'aliases': [str],
+            'n_el': Any(int, None),
             'blocks': [{
                 "n": int,
                 "l": [All([int], Length(2, 2)), All((int,), Length(2, 2))],
@@ -142,6 +144,15 @@ class BasisSet(Data):
         :rtype: int
         """
         return self.get_attr('version', None)
+
+    @property
+    def n_el(self):
+        """
+        number of valence electron covered by this basis set
+
+        :rtype: int
+        """
+        return self.get_attr('n_el', None)
 
     @property
     def blocks(self):

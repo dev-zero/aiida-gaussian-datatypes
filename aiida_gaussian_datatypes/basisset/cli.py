@@ -40,9 +40,18 @@ def _formatted_table(bsets):
     def names_column(name, aliases):
         return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
-    table_content = [(n+1, b.element, names_column(b.name, b.aliases), ', '.join(b.tags), b.version)
-                     for n, b in enumerate(bsets)]
-    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Version'])
+    def row(num, bset):
+        return (
+            num+1,
+            bset.element,
+            names_column(bset.name, bset.aliases),
+            ', '.join(bset.tags),
+            bset.n_el if bset.n_el else '<unknown>',
+            bset.version,
+            )
+
+    table_content = [row(n, b) for n, b in enumerate(bsets)]
+    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', '# Val. e⁻', 'Version'])
 
 
 @verdi_data.group('gaussian.basisset')

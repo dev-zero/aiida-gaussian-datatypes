@@ -25,9 +25,12 @@ SOFTWARE.
 
 import re
 
+from ..utils import SYM2NUM
+
 
 EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
 BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
+N_VAL_EL_MATCH = re.compile(r'^q(\d+)$')
 
 
 def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f")):
@@ -113,6 +116,28 @@ def parse_single_cp2k_basisset(basis):
     tags = name.split('-')
     aliases = [name] + identifiers  # use the remaining identifiers as aliases
 
+    n_el = None
+
+    for tag in tags:
+        match = N_VAL_EL_MATCH.match(tag)
+
+        if not match:
+            continue
+
+        if not n_el:
+            n_el = int(match.group(1))
+            continue  # go to next to check for multiple tags
+
+        if n_el != int(match.group(1)):
+            # found multiple different #(Val.El.) tags, ignore all of them
+            n_el = None
+            break  # and terminate the loop
+
+    # the ALL* tags indicate an all-electron basis set, but they might be ambigious,
+    # ignore them if we found an explicit #(val.el.) spec already
+    if not n_el and any(kw in tags for kw in ['ALL', 'ALLELECTRON']):
+        n_el = SYM2NUM(element)
+
     # The second line contains the number of sets, conversion to int ignores any whitespace
     n_blocks = int(basis[1])
 
@@ -142,5 +167,6 @@ def parse_single_cp2k_basisset(basis):
         'name': name,
         'tags': tags,
         'aliases': aliases,
+        'n_el': n_el,
         'blocks': blocks,
         }
