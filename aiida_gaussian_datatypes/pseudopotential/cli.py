@@ -40,9 +40,18 @@ def _formatted_table(pseudos):
     def names_column(name, aliases):
         return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
-    table_content = [(n+1, p.element, names_column(p.name, p.aliases), ', '.join(p.tags), ', '.join(f"{n}" for n in p.n_el), p.version)
-                     for n, p in enumerate(pseudos)]
-    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Valence e⁻ (s, p, d)', 'Version'])
+    def row(num, pseudo):
+        return (
+            num+1,
+            pseudo.element,
+            names_column(pseudo.name, pseudo.aliases),
+            ', '.join(pseudo.tags),
+            ', '.join(f"{n}" for n in pseudo.n_el + (3-len(pseudo.n_el))*[0]),
+            pseudo.version,
+            )
+
+    table_content = [row(n, p) for n, p in enumerate(pseudos)]
+    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Val. e⁻ (s, p, d)', 'Version'])
 
 
 @verdi_data.group('gaussian.pseudo')
@@ -99,7 +108,8 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
                            value_proc=lambda v: click_parse_range(v, len(pseudos)))
 
     for idx in indexes:
-        echo.echo_info("Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]), nl=False)
+        echo.echo_info("Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]),
+                       nl=False)
         pseudos[idx].store()
         echo.echo("DONE")
 
@@ -135,7 +145,7 @@ def list_pseudos(sym, name, tags):
         echo.echo("No Gaussian Pseudopotentials found.")
         return
 
-    echo.echo_info("{} Gaussian Pseudopotential found:\n".format(query.count()))
+    echo.echo_info("{} Gaussian Pseudopotential founds:\n".format(query.count()))
     echo.echo(_formatted_table([pseudo for [pseudo] in query.iterall()]))
     echo.echo("")
 
