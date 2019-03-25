@@ -23,7 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from aiida.orm.data import Data
+from aiida.orm import Data
 from aiida.common.exceptions import ValidationError
 
 from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
@@ -46,14 +46,14 @@ class Pseudopotential(Data):
         if 'dbnode' in kwargs:
             return  # node was loaded from database
 
-        self._set_attr('name', name)
-        self._set_attr('element', element)
-        self._set_attr('tags', tags)
-        self._set_attr('aliases', aliases)
-        self._set_attr('n_el', n_el)
-        self._set_attr('local', local)
-        self._set_attr('non_local', non_local)
-        self._set_attr('version', version)
+        self.set_attribute('name', name)
+        self.set_attribute('element', element)
+        self.set_attribute('tags', tags)
+        self.set_attribute('aliases', aliases)
+        self.set_attribute('n_el', n_el)
+        self.set_attribute('local', local)
+        self.set_attribute('non_local', non_local)
+        self.set_attribute('version', version)
 
     def store(self, *args, **kwargs):
         """
@@ -97,14 +97,12 @@ class Pseudopotential(Data):
             'version': int,
             }, extra=ALLOW_EXTRA, required=True)
 
-        data = dict(self.iterattrs())
-
         try:
-            schema(data)
+            schema(self.attributes)
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
-        for nlocal in data['non_local']:
+        for nlocal in self.attributes['non_local']:
             if len(nlocal['coeffs']) != nlocal['nproj']*(nlocal['nproj']+1) // 2:
                 raise ValidationError("invalid number of coefficients for non-local projection")
 
@@ -115,7 +113,7 @@ class Pseudopotential(Data):
 
         :rtype: str
         """
-        return self.get_attr('element', None)
+        return self.get_attribute('element', None)
 
     @property
     def name(self):
@@ -124,7 +122,7 @@ class Pseudopotential(Data):
 
         :rtype: str
         """
-        return self.get_attr('name', None)
+        return self.get_attribute('name', None)
 
     @property
     def aliases(self):
@@ -133,7 +131,7 @@ class Pseudopotential(Data):
 
         :rtype: []
         """
-        return self.get_attr('aliases', [])
+        return self.get_attribute('aliases', [])
 
     @property
     def tags(self):
@@ -142,7 +140,7 @@ class Pseudopotential(Data):
 
         :rtype: []
         """
-        return self.get_attr('tags', [])
+        return self.get_attribute('tags', [])
 
     @property
     def version(self):
@@ -151,7 +149,7 @@ class Pseudopotential(Data):
 
         :rtype: int
         """
-        return self.get_attr('version', None)
+        return self.get_attribute('version', None)
 
     @property
     def n_el(self):
@@ -160,7 +158,7 @@ class Pseudopotential(Data):
         :rtype:list
         """
 
-        return self.get_attr('n_el', [])
+        return self.get_attribute('n_el', [])
 
     @property
     def local(self):
@@ -174,7 +172,7 @@ class Pseudopotential(Data):
 
         :rtype:dict
         """
-        return self.get_attr('local', None)
+        return self.get_attribute('local', None)
 
     @property
     def non_local(self):
@@ -189,7 +187,7 @@ class Pseudopotential(Data):
 
         :rtype:list
         """
-        return self.get_attr('non_local', [])
+        return self.get_attribute('non_local', [])
 
     @classmethod
     def get(cls, element, name=None, version='latest', match_aliases=True):

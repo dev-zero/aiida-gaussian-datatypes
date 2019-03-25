@@ -23,7 +23,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 """
 
-from aiida.orm.data import Data
+from aiida.orm import Data
 from aiida.common.exceptions import ValidationError
 
 from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
@@ -49,13 +49,13 @@ class BasisSet(Data):
         if 'dbnode' in kwargs:
             return  # node was loaded from database
 
-        self._set_attr('name', name)
-        self._set_attr('element', element)
-        self._set_attr('tags', tags)
-        self._set_attr('aliases', aliases)
-        self._set_attr('n_el', n_el)
-        self._set_attr('blocks', blocks)
-        self._set_attr('version', version)
+        self.set_attribute('name', name)
+        self.set_attribute('element', element)
+        self.set_attribute('tags', tags)
+        self.set_attribute('aliases', aliases)
+        self.set_attribute('n_el', n_el)
+        self.set_attribute('blocks', blocks)
+        self.set_attribute('version', version)
 
     def store(self, *args, **kwargs):
         """
@@ -96,7 +96,7 @@ class BasisSet(Data):
             }, extra=ALLOW_EXTRA, required=True)
 
         try:
-            schema(dict(self.iterattrs()))
+            schema(self.attributes)
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
@@ -107,7 +107,7 @@ class BasisSet(Data):
 
         :rtype: str
         """
-        return self.get_attr('element', None)
+        return self.get_attribute('element', None)
 
     @property
     def name(self):
@@ -116,7 +116,7 @@ class BasisSet(Data):
 
         :rtype: str
         """
-        return self.get_attr('name', None)
+        return self.get_attribute('name', None)
 
     @property
     def aliases(self):
@@ -125,7 +125,7 @@ class BasisSet(Data):
 
         :rtype: []
         """
-        return self.get_attr('aliases', [])
+        return self.get_attribute('aliases', [])
 
     @property
     def tags(self):
@@ -134,7 +134,7 @@ class BasisSet(Data):
 
         :rtype: []
         """
-        return self.get_attr('tags', [])
+        return self.get_attribute('tags', [])
 
     @property
     def version(self):
@@ -143,7 +143,7 @@ class BasisSet(Data):
 
         :rtype: int
         """
-        return self.get_attr('version', None)
+        return self.get_attribute('version', None)
 
     @property
     def n_el(self):
@@ -152,7 +152,7 @@ class BasisSet(Data):
 
         :rtype: int
         """
-        return self.get_attr('n_el', None)
+        return self.get_attribute('n_el', None)
 
     @property
     def blocks(self):
@@ -179,7 +179,7 @@ class BasisSet(Data):
         :rtype: []
         """
 
-        return self.get_attr('blocks', [])
+        return self.get_attribute('blocks', [])
 
     @classmethod
     def get(cls, element, name=None, version='latest', match_aliases=True):
