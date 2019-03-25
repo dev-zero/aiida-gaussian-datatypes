@@ -24,7 +24,8 @@
     "setup_requires": ["reentry"],
     "reentry_register": true,
     "install_requires": [
-        "aiida-core >= 1.0.0a1"
+        "voluptuous >= 0.11.5",
+        "aiida-core >= 1.0.0b1"
     ],
     "extras_require": {
         "testing": [
@@ -38,7 +39,7 @@
         ],
         "docs": [
             "sphinx >= 1.8b1",
-            "sphinx-click >= 1.0.3"
+            "sphinx-click >= 1.4.0"
         ]
     }
 }
