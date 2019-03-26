@@ -34,7 +34,6 @@
         "pre-commit": [
             "pre-commit",
             "yapf",
-            "prospector",
             "pylint"
         ],
         "docs": [

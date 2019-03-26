@@ -2,16 +2,13 @@
 # pre-commit install
  
 # yapf = yet another python formatter
-- repo: git://github.com/pre-commit/mirrors-yapf
-  sha: v0.17.0
+- repo: https://github.com/pre-commit/mirrors-yapf
+  sha: v0.26.0
   hooks:
   - id: yapf
-    language: system
 
-# prospector: collection of python linters
-- repo: git://github.com/guykisel/prospector-mirror
-  sha: b27f281eb9398fc8504415d7fbdabf119ea8c5e1
+# pylint: THE python linter
+- repo: https://github.com/pre-commit/mirrors-pylint
+  rev: v2.3.1
   hooks:
-  - id: prospector
-    language: system
-    exclude: '^(tests/)|(examples/)'
+  - id: pylint
