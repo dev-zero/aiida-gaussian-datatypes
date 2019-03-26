@@ -20,14 +20,15 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
       0.066918004004  0.037148121400  0.438703133000  0.892971208700
       0.021708243634 -0.001125195500 -0.059693171300  0.120101316500
 """
-        
+
         parsed = parse_single_cp2k_basisset(content.splitlines())
 
         result = {
             'name': 'DZVP-MOLOPT-GTH-q1',
             'element': 'H',
+            'n_el': 1,
             'tags': ['DZVP', 'MOLOPT', 'GTH', 'q1'],
-            'aliases': ['DZVP-MOLOPT-GTH'],
+            'aliases': ['DZVP-MOLOPT-GTH-q1', 'DZVP-MOLOPT-GTH'],
             'blocks': [{
                 "n": 2,
                 "l": [(0, 2), (1, 1)],
@@ -61,10 +62,10 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(
-                [l.strip() for l in content.splitlines()[1:]],
-                [l.lstrip() for l in output.getvalue().splitlines()[1:]]
-                )
-        
+            [l.strip() for l in content.splitlines()[1:]],  # do not compare the name
+            [l.lstrip() for l in output.getvalue().splitlines()[2:]]  # do not compare the comment or the name
+            )
+
     def test_roundtrip_multi_shell(self):
 
         with open("tests/BASIS_pob-TZVP.H", 'r') as fhandle:
@@ -76,11 +77,11 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
         write_cp2k_basisset(
             output,
             **{k: v for k, v in parsed.items() if k in ['element', 'name', 'blocks']},
-            fmts=("{: > #12.9f}", "{: > #12.9f}")  # this basis uses a shorter format
+            fmts=(" > #12.9f", " > #12.9f")  # this basis uses a shorter format
             )
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(
-                [l.strip() for l in content.splitlines()[1:]],
-                [l.lstrip() for l in output.getvalue().splitlines()[1:]]
-                )
+            [l.strip() for l in content.splitlines()[1:]],  # do not compare the name
+            [l.lstrip() for l in output.getvalue().splitlines()[2:]]  # do not compare the comment or the name
+            )
