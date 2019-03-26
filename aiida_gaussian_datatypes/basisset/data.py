@@ -272,4 +272,6 @@ class BasisSet(Data):
         :param fhandle: A valid output file handle
         """
 
-        return write_cp2k_basisset(fhandle, self.element, self.name, self.blocks)
+        return write_cp2k_basisset(fhandle,
+                                   self.element, self.name, self.blocks,
+                                   comment=f"from AiiDA BasisSet<uuid: {self.uuid}>")

@@ -288,4 +288,6 @@ class Pseudopotential(Data):
 
         :param fhandle: open file handle
         """
-        write_cp2k_pseudo(fhandle, self.element, self.name, self.n_el, self.local, self.non_local)
+        write_cp2k_pseudo(fhandle,
+                          self.element, self.name, self.n_el, self.local, self.non_local,
+                          comment=f"from AiiDA Pseudopotential<uuid: {self.uuid}>")

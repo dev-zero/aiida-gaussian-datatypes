@@ -135,7 +135,7 @@ def parse_single_cp2k_pseudo(lines):
         }
 
 
-def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, fmts=(">#4d", ">#14.8f", "> #14.8f")):
+def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, comment="", fmts=(">#4d", ">#14.8f", "> #14.8f")):
     """
     Write a Gaussian Pseudopotential to file in CP2K format.
 
@@ -148,6 +148,8 @@ def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, fmts=(">#4
     """
 
     i_fmt, r_fmt, c_fmt = fmts
+
+    fhandle.write(f"# {comment}\n")
 
     fhandle.write(f"{element} {name}\n")
     fhandle.write(" ".join(f"{i:{i_fmt}}" for i in n_el))
@@ -179,5 +181,3 @@ def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, fmts=(">#4
             ecol = scol + nproj - nrow
             fhandle.write(" ".join(f"{c:{c_fmt}}" for c in nlcoeffs[scol:ecol]))
             fhandle.write("\n")
-
-    fhandle.write("#\n")

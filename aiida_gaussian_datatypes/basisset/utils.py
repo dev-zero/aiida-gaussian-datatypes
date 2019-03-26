@@ -33,7 +33,7 @@ BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n'
 N_VAL_EL_MATCH = re.compile(r'^q(\d+)$')
 
 
-def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f")):
+def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f"), comment=""):
     """
     Write the Basis Set to the passed file handle in the format expected by CP2K.
 
@@ -43,6 +43,8 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14
     :param blocks: The actual basis set data
     :param fmts: Tuple of Python format strings, the first one for the exponents, the second for the coefficients
     """
+
+    fhandle.write(f"# {comment}\n")
 
     fhandle.write(
         f"{element} {name}\n"
@@ -63,8 +65,6 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14
             fhandle.write(" ")
             fhandle.write(" ".join(f"{f:{c_fmt}}" for f in row[1:]))
             fhandle.write("\n")
-
-    fhandle.write("#\n")
 
 
 def cp2k_basisset_file_iter(fhandle):
