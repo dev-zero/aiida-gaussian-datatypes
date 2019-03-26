@@ -30,21 +30,25 @@ import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
+from aiida.cmdline.params import arguments
+from aiida.cmdline.params.types import DataParamType
 
 from ..utils import click_parse_range
 
 
-def _formatted_table(bsets):
-    """generates a formatted table (using tabulate) for the given list of basis sets"""
+def _names_column(name, aliases):
+    return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
-    def names_column(name, aliases):
-        return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
+
+def _formatted_table_import(bsets):
+    """generates a formatted table (using tabulate) for the given list of basis sets, showing a sequencial number"""
+
 
     def row(num, bset):
         return (
             num+1,
             bset.element,
-            names_column(bset.name, bset.aliases),
+            _names_column(bset.name, bset.aliases),
             ', '.join(bset.tags),
             bset.n_el if bset.n_el else '<unknown>',
             bset.version,
@@ -52,6 +56,23 @@ def _formatted_table(bsets):
 
     table_content = [row(n, b) for n, b in enumerate(bsets)]
     return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', '# Val. e⁻', 'Version'])
+
+
+def _formatted_table_list(bsets):
+    """generates a formatted table (using tabulate) for the given list of basis sets, showing the ID"""
+
+    def row(bset):
+        return (
+            bset.uuid,
+            bset.element,
+            _names_column(bset.name, bset.aliases),
+            ', '.join(bset.tags),
+            bset.n_el if bset.n_el else '<unknown>',
+            bset.version,
+            )
+
+    table_content = [row(b) for b in bsets]
+    return tabulate.tabulate(table_content, headers=['ID', 'Sym', 'Names', 'Tags', '# Val. e⁻', 'Version'])
 
 
 @verdi_data.group('gaussian.basisset')
@@ -100,7 +121,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
         return
 
     echo.echo_info("{} Gaussian Basis Sets found:\n".format(len(bsets)))
-    echo.echo(_formatted_table(bsets))
+    echo.echo(_formatted_table_import(bsets))
     echo.echo("")
 
     indexes = click.prompt("Which Gaussian Basis Set do you want to add?"
@@ -146,11 +167,12 @@ def list_basisset(sym, name, tags):
         return
 
     echo.echo_info("{} Gaussian Basis Sets found:\n".format(query.count()))
-    echo.echo(_formatted_table([bs for [bs] in query.iterall()]))
+    echo.echo(_formatted_table_list(bs for [bs] in query.iterall()))
     echo.echo("")
 
 
 @cli.command('dump')
+@arguments.DATA(type=DataParamType(sub_classes=("aiida.data:gaussian.basisset",)))
 @click.option('-s', '--sym', type=str, default=None,
               help="filter by a specific element")
 @click.option('-n', '--name', type=str, default=None,
@@ -160,7 +182,7 @@ def list_basisset(sym, name, tags):
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
               help="Chose the output format for the basiset: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
-def dump_basisset(sym, name, tags, output_format):
+def dump_basisset(sym, name, tags, output_format, data):
     """
     Print specified Basis Sets
     """
@@ -172,25 +194,31 @@ def dump_basisset(sym, name, tags, output_format):
         "cp2k": BasisSet.to_cp2k,
         }
 
-    query = QueryBuilder()
-    query.append(BasisSet,
-                 project=['uuid', 'attributes.id', 'attributes.element', '*'])
+    if data:
+        # if explicit nodes where given the only thing left is to make sure no filters are present
+        if sym or name or tags:
+            raise click.UsageError("can not specify node IDs and filters at the same time")
+    else:
+        query = QueryBuilder()
+        query.append(BasisSet, project=['*'])
 
-    if sym:
-        query.add_filter(BasisSet, {'attributes.element': {'==': sym}})
+        if sym:
+            query.add_filter(BasisSet, {'attributes.element': {'==': sym}})
 
-    if name:
-        query.add_filter(BasisSet, {'attributes.aliases': {'contains': [name]}})
+        if name:
+            query.add_filter(BasisSet, {'attributes.aliases': {'contains': [name]}})
 
-    if tags:
-        query.add_filter(BasisSet, {'attributes.tags': {'contains': tags}})
+        if tags:
+            query.add_filter(BasisSet, {'attributes.tags': {'contains': tags}})
 
-    if not query.count():
-        echo.echo_warning("No Gaussian Basis Sets found.", err=echo.is_stdout_redirected())
-        return
+        if not query.count():
+            echo.echo_warning("No Gaussian Basis Sets found.", err=echo.is_stdout_redirected())
+            return
 
-    for uuid, name, element, bset in query.iterall():
+        data = [bset for bset, in query.iterall()]  # query always returns a tuple, unpack it here
+
+    for bset in data:
         if echo.is_stdout_redirected():
-            echo.echo_info("Dumping {}/{} ({})...".format(name, element, uuid), err=True)
+            echo.echo_info("Dumping {}/{} ({})...".format(bset.name, bset.element, bset.uuid), err=True)
 
         writers[output_format](bset, sys.stdout)

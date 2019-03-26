@@ -30,21 +30,24 @@ import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
+from aiida.cmdline.params import arguments
+from aiida.cmdline.params.types import DataParamType
 
 from ..utils import click_parse_range
 
 
-def _formatted_table(pseudos):
-    """generates a formatted table (using tabulate) for the given list of Pseudopotentials"""
+def _names_column(name, aliases):
+    return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
-    def names_column(name, aliases):
-        return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
+
+def _formatted_table_import(pseudos):
+    """generates a formatted table (using tabulate) for the given list of pseudopotentials, showing a sequencial number"""
 
     def row(num, pseudo):
         return (
             num+1,
             pseudo.element,
-            names_column(pseudo.name, pseudo.aliases),
+            _names_column(pseudo.name, pseudo.aliases),
             ', '.join(pseudo.tags),
             ', '.join(f"{n}" for n in pseudo.n_el + (3-len(pseudo.n_el))*[0]),
             pseudo.version,
@@ -52,6 +55,23 @@ def _formatted_table(pseudos):
 
     table_content = [row(n, p) for n, p in enumerate(pseudos)]
     return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', 'Val. e⁻ (s, p, d)', 'Version'])
+
+
+def _formatted_table_list(pseudos):
+    """generates a formatted table (using tabulate) for the given list of pseudopotentials, showing the ID"""
+
+    def row(pseudo):
+        return (
+            pseudo.uuid,
+            pseudo.element,
+            _names_column(pseudo.name, pseudo.aliases),
+            ', '.join(pseudo.tags),
+            ', '.join(f"{n}" for n in pseudo.n_el + (3-len(pseudo.n_el))*[0]),
+            pseudo.version,
+            )
+
+    table_content = [row(p) for p in pseudos]
+    return tabulate.tabulate(table_content, headers=['ID', 'Sym', 'Names', 'Tags', 'Val. e⁻ (s, p, d)', 'Version'])
 
 
 @verdi_data.group('gaussian.pseudo')
@@ -100,7 +120,7 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
         return
 
     echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
-    echo.echo(_formatted_table(pseudos))
+    echo.echo(_formatted_table_import(pseudos))
     echo.echo("")
 
     indexes = click.prompt("Which Gaussian Pseudopotentials do you want to add?"
@@ -146,11 +166,12 @@ def list_pseudos(sym, name, tags):
         return
 
     echo.echo_info("{} Gaussian Pseudopotential founds:\n".format(query.count()))
-    echo.echo(_formatted_table([pseudo for [pseudo] in query.iterall()]))
+    echo.echo(_formatted_table_list(pseudo for [pseudo] in query.iterall()))
     echo.echo("")
 
 
 @cli.command('dump')
+@arguments.DATA(type=DataParamType(sub_classes=("aiida.data:gaussian.pseudo",)))
 @click.option('-s', '--sym', type=str, default=None,
               help="filter by a specific element")
 @click.option('-n', '--name', type=str, default=None,
@@ -160,9 +181,9 @@ def list_pseudos(sym, name, tags):
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
               help="Chose the output format for the pseudopotentials: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
-def dump_pseudo(sym, name, tags, output_format):
+def dump_pseudo(sym, name, tags, output_format, data):
     """
-    Print specified Pseudopotential
+    Print specified Pseudopotentials
     """
 
     from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
@@ -172,25 +193,31 @@ def dump_pseudo(sym, name, tags, output_format):
         "cp2k": Pseudopotential.to_cp2k,
         }
 
-    query = QueryBuilder()
-    query.append(Pseudopotential,
-                 project=['uuid', 'attributes.id', 'attributes.element', '*'])
+    if data:
+        # if explicit nodes where given the only thing left is to make sure no filters are present
+        if sym or name or tags:
+            raise click.UsageError("can not specify node IDs and filters at the same time")
+    else:
+        query = QueryBuilder()
+        query.append(Pseudopotential, project=['*'])
 
-    if sym:
-        query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
+        if sym:
+            query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
 
-    if name:
-        query.add_filter(Pseudopotential, {'attributes.aliases': {'contains': [name]}})
+        if name:
+            query.add_filter(Pseudopotential, {'attributes.aliases': {'contains': [name]}})
 
-    if tags:
-        query.add_filter(Pseudopotential, {'attributes.tags': {'contains': tags}})
+        if tags:
+            query.add_filter(Pseudopotential, {'attributes.tags': {'contains': tags}})
 
-    if not query.count():
-        echo.echo_warning("No Gaussian Pseudopotential found.", err=echo.is_stdout_redirected())
-        return
+        if not query.count():
+            echo.echo_warning("No Gaussian Pseudopotential found.", err=echo.is_stdout_redirected())
+            return
 
-    for uuid, name, element, pseudo in query.iterall():
+        data = [pseudo for pseudo, in query.iterall()]  # query always returns a tuple, unpack it here
+
+    for pseudo in data:
         if echo.is_stdout_redirected():
-            echo.echo_info("Dumping {}/{} ({})...".format(name, element, uuid), err=True)
+            echo.echo_info("Dumping {}/{} ({})...".format(pseudo.name, pseudo.element, pseudo.uuid), err=True)
 
         writers[output_format](pseudo, sys.stdout)
