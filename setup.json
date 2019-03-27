@@ -33,7 +33,6 @@
         ],
         "pre-commit": [
             "pre-commit",
-            "yapf",
             "pylint"
         ],
         "docs": [
