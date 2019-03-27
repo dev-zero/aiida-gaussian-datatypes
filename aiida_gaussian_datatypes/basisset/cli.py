@@ -37,60 +37,64 @@ from ..utils import click_parse_range
 
 
 def _names_column(name, aliases):
-    return ', '.join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
+    return ", ".join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
 
 
 def _formatted_table_import(bsets):
-    """generates a formatted table (using tabulate) for the given list of basis sets, showing a sequencial number"""
-
+    """generates a formatted table (using tabulate) for the given list of basis sets, shows a sequencial number"""
 
     def row(num, bset):
         return (
-            num+1,
+            num + 1,
             bset.element,
             _names_column(bset.name, bset.aliases),
-            ', '.join(bset.tags),
-            bset.n_el if bset.n_el else '<unknown>',
+            ", ".join(bset.tags),
+            bset.n_el if bset.n_el else "<unknown>",
             bset.version,
-            )
+        )
 
     table_content = [row(n, b) for n, b in enumerate(bsets)]
-    return tabulate.tabulate(table_content, headers=['Nr.', 'Sym', 'Names', 'Tags', '# Val. e⁻', 'Version'])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "# Val. e⁻", "Version"])
 
 
 def _formatted_table_list(bsets):
-    """generates a formatted table (using tabulate) for the given list of basis sets, showing the ID"""
+    """generates a formatted table (using tabulate) for the given list of basis sets, shows the UUID"""
 
     def row(bset):
         return (
             bset.uuid,
             bset.element,
             _names_column(bset.name, bset.aliases),
-            ', '.join(bset.tags),
-            bset.n_el if bset.n_el else '<unknown>',
+            ", ".join(bset.tags),
+            bset.n_el if bset.n_el else "<unknown>",
             bset.version,
-            )
+        )
 
     table_content = [row(b) for b in bsets]
-    return tabulate.tabulate(table_content, headers=['ID', 'Sym', 'Names', 'Tags', '# Val. e⁻', 'Version'])
+    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "# Val. e⁻", "Version"])
 
 
-@verdi_data.group('gaussian.basisset')
+@verdi_data.group("gaussian.basisset")
 def cli():
     """Manage basis sets for GTO-based codes"""
-    pass
 
 
+# fmt: off
 @cli.command('import')
 @click.argument('basisset_file', type=click.File(mode='r'))
 @click.option('--sym', '-s', help="filter by atomic symbol")
-@click.option('tags', '--tag', '-t', multiple=True,
-              help="filter by a tag (all tags must be present if specified multiple times)")
-@click.option('fformat', '-f', '--format',
-              type=click.Choice(['cp2k', ]), default='cp2k',
-              help="the format of the basis set file")
-@click.option('--duplicates', type=click.Choice(['ignore', 'error', 'new']), default='ignore',
-              help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+@click.option(
+    'tags', '--tag', '-t',
+    multiple=True,
+    help="filter by a tag (all tags must be present if specified multiple times)")
+@click.option(
+    'fformat', '-f', '--format', type=click.Choice(['cp2k']), default='cp2k',
+    help="the format of the basis set file")
+@click.option(
+    '--duplicates',
+    type=click.Choice(['ignore', 'error', 'new']), default='ignore',
+    help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+# fmt: on
 @decorators.with_dbenv()
 def import_basisset(basisset_file, fformat, sym, tags, duplicates):
     """
@@ -101,12 +105,12 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
 
     loaders = {
         "cp2k": BasisSet.from_cp2k,
-        }
+    }
 
     filters = {
         'element': lambda x: not sym or x == sym,
         'tags': lambda x: not tags or set(tags).issubset(x),
-        }
+    }
 
     bsets = loaders[fformat](basisset_file, filters, duplicates)
 
@@ -124,9 +128,10 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
     echo.echo(_formatted_table_import(bsets))
     echo.echo("")
 
-    indexes = click.prompt("Which Gaussian Basis Set do you want to add?"
-                           " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
-                           value_proc=lambda v: click_parse_range(v, len(bsets)))
+    indexes = click.prompt(
+        "Which Gaussian Basis Set do you want to add?"
+        " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
+        value_proc=lambda v: click_parse_range(v, len(bsets)))
 
     for idx in indexes:
         echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
@@ -135,12 +140,10 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
 
 
 @cli.command('list')
-@click.option('-s', '--sym', type=str, default=None,
-              help="filter by a specific element")
-@click.option('-n', '--name', type=str, default=None,
-              help="filter by name")
-@click.option('tags', '--tag', '-t', multiple=True,
-              help="filter by a tag (all tags must be present if specified multiple times)")
+@click.option('-s', '--sym', type=str, default=None, help="filter by a specific element")
+@click.option('-n', '--name', type=str, default=None, help="filter by name")
+@click.option(
+    'tags', '--tag', '-t', multiple=True, help="filter by a tag (all tags must be present if specified multiple times)")
 @decorators.with_dbenv()
 def list_basisset(sym, name, tags):
     """
@@ -171,6 +174,7 @@ def list_basisset(sym, name, tags):
     echo.echo("")
 
 
+# fmt: off
 @cli.command('dump')
 @arguments.DATA(type=DataParamType(sub_classes=("aiida.data:gaussian.basisset",)))
 @click.option('-s', '--sym', type=str, default=None,
@@ -181,6 +185,7 @@ def list_basisset(sym, name, tags):
               help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
               help="Chose the output format for the basiset: " + ', '.join(['cp2k', ]))
+# fmt: on
 @decorators.with_dbenv()
 def dump_basisset(sym, name, tags, output_format, data):
     """
@@ -192,7 +197,7 @@ def dump_basisset(sym, name, tags, output_format, data):
 
     writers = {
         "cp2k": BasisSet.to_cp2k,
-        }
+    }
 
     if data:
         # if explicit nodes where given the only thing left is to make sure no filters are present

@@ -34,7 +34,9 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(self, element=None, name=None, aliases=[], tags=[], n_el=None, blocks=[], version=1, **kwargs):
+    def __init__(
+        self, element=None, name=None, aliases=[], tags=[], n_el=None, blocks=[], version=1, **kwargs
+    ):  # pylint: disable=dangerous-default-value,too-many-arguments
         """
         :param element: string containing the name of the element
         :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
@@ -46,18 +48,18 @@ class BasisSet(Data):
 
         super(BasisSet, self).__init__(**kwargs)
 
-        if 'dbnode' in kwargs:
+        if "dbnode" in kwargs:
             return  # node was loaded from database
 
-        self.set_attribute('name', name)
-        self.set_attribute('element', element)
-        self.set_attribute('tags', tags)
-        self.set_attribute('aliases', aliases)
-        self.set_attribute('n_el', n_el)
-        self.set_attribute('blocks', blocks)
-        self.set_attribute('version', version)
+        self.set_attribute("name", name)
+        self.set_attribute("element", element)
+        self.set_attribute("tags", tags)
+        self.set_attribute("aliases", aliases)
+        self.set_attribute("n_el", n_el)
+        self.set_attribute("blocks", blocks)
+        self.set_attribute("version", version)
 
-    def store(self, *args, **kwargs):
+    def store(self, *args, **kwargs):  # pylint: disable=arguments-differ
         """
         Store the node, ensuring that the combination (element,name,version) is unique.
         """
@@ -71,8 +73,9 @@ class BasisSet(Data):
             pass
         else:
             raise UniquenessError(
-                "Gaussian Basis Set already exists for element={b.element}, name={b.name}, version={b.version}: {uuid}"
-                .format(uuid=existing.uuid, b=self))
+                f"Gaussian Basis Set already exists for"
+                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
+            )
 
         return super(BasisSet, self).store(*args, **kwargs)
 
@@ -81,6 +84,7 @@ class BasisSet(Data):
 
         from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Any, Length
 
+        # fmt: off
         schema = Schema({
             'name': str,
             'element': str,
@@ -94,6 +98,7 @@ class BasisSet(Data):
                 }],
             'version': int,
             }, extra=ALLOW_EXTRA, required=True)
+        # fmt: on
 
         try:
             schema(self.attributes)
@@ -107,7 +112,7 @@ class BasisSet(Data):
 
         :rtype: str
         """
-        return self.get_attribute('element', None)
+        return self.get_attribute("element", None)
 
     @property
     def name(self):
@@ -116,7 +121,7 @@ class BasisSet(Data):
 
         :rtype: str
         """
-        return self.get_attribute('name', None)
+        return self.get_attribute("name", None)
 
     @property
     def aliases(self):
@@ -125,7 +130,7 @@ class BasisSet(Data):
 
         :rtype: []
         """
-        return self.get_attribute('aliases', [])
+        return self.get_attribute("aliases", [])
 
     @property
     def tags(self):
@@ -134,7 +139,7 @@ class BasisSet(Data):
 
         :rtype: []
         """
-        return self.get_attribute('tags', [])
+        return self.get_attribute("tags", [])
 
     @property
     def version(self):
@@ -143,7 +148,7 @@ class BasisSet(Data):
 
         :rtype: int
         """
-        return self.get_attribute('version', None)
+        return self.get_attribute("version", None)
 
     @property
     def n_el(self):
@@ -152,7 +157,7 @@ class BasisSet(Data):
 
         :rtype: int
         """
-        return self.get_attribute('n_el', None)
+        return self.get_attribute("n_el", None)
 
     @property
     def blocks(self):
@@ -179,40 +184,37 @@ class BasisSet(Data):
         :rtype: []
         """
 
-        return self.get_attribute('blocks', [])
+        return self.get_attribute("blocks", [])
 
     @classmethod
-    def get(cls, element, name=None, version='latest', match_aliases=True):
+    def get(cls, element, name=None, version="latest", match_aliases=True):  # pylint: disable=arguments-differ
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
-        filters = {
-            'attributes.element': {'==': element},
-            }
+        filters = {"attributes.element": {"==": element}}
 
-        if version != 'latest':
-            filters['attributes.version'] = {'==': version}
+        if version != "latest":
+            filters["attributes.version"] = {"==": version}
 
         if match_aliases:
-            filters['attributes.aliases'] = {'contains': [name]}
+            filters["attributes.aliases"] = {"contains": [name]}
         else:
-            filters['attributes.name'] = {'==': name}
+            filters["attributes.name"] = {"==": name}
 
         query = QueryBuilder()
         query.append(BasisSet)
         query.add_filter(BasisSet, filters)
-        query.order_by({BasisSet: [{'attributes.version': {'cast': 'i', 'order': 'desc'}}]})
+        query.order_by({BasisSet: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
 
         existing = query.first()
 
         if not existing:
-            raise NotExistent("No Gaussian Basis Set found for element={element}, name={name}, version={version}"
-                              .format(element=element, name=name, version=version))
+            raise NotExistent(f"No Gaussian Basis Set found for element={element}, name={name}, version={version}")
 
         return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters, duplicate_handling='ignore'):
+    def from_cp2k(cls, fhandle, filters, duplicate_handling="ignore"):
         """
         Constructs a list with basis set objects from a Basis Set in CP2K format
 
@@ -229,7 +231,7 @@ class BasisSet(Data):
 
         def exists(bset):
             try:
-                cls.get(bset['element'], bset['name'], match_aliases=False)
+                cls.get(bset["element"], bset["name"], match_aliases=False)
             except NotExistent:
                 return False
 
@@ -237,31 +239,31 @@ class BasisSet(Data):
 
         bsets = [bs for bs in cp2k_basisset_file_iter(fhandle) if matches_criteria(bs)]
 
-        if duplicate_handling == 'ignore':  # simply filter duplicates
+        if duplicate_handling == "ignore":  # simply filter duplicates
             bsets = [bs for bs in bsets if not exists(bs)]
 
-        elif duplicate_handling == 'error':
+        elif duplicate_handling == "error":
             for bset in bsets:
                 try:
-                    latest = cls.get(bset['element'], bset['name'], match_aliases=False)
+                    latest = cls.get(bset["element"], bset["name"], match_aliases=False)
                 except NotExistent:
                     pass
                 else:
                     raise UniquenessError(
-                        "Gaussian Basis Set already exists for element={element}, name={name}: {uuid}"
-                        .format(uuid=latest.uuid, **bset))
+                        f"Gaussian Basis Set already exists for element={bset.element}, name={bset.name}: {latest.uuid}"
+                    )
 
-        elif duplicate_handling == 'new':
+        elif duplicate_handling == "new":
             for bset in bsets:
                 try:
-                    latest = cls.get(bset['element'], bset['name'], match_aliases=False)
+                    latest = cls.get(bset["element"], bset["name"], match_aliases=False)
                 except NotExistent:
                     pass
                 else:
-                    bset['version'] = latest.version + 1
+                    bset["version"] = latest.version + 1
 
         else:
-            raise ValueError("Specified duplicate handling strategy not recognized: '{}'".format(duplicate_handling))
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**bs) for bs in bsets]
 
@@ -272,6 +274,6 @@ class BasisSet(Data):
         :param fhandle: A valid output file handle
         """
 
-        return write_cp2k_basisset(fhandle,
-                                   self.element, self.name, self.blocks,
-                                   comment=f"from AiiDA BasisSet<uuid: {self.uuid}>")
+        return write_cp2k_basisset(
+            fhandle, self.element, self.name, self.blocks, comment=f"from AiiDA BasisSet<uuid: {self.uuid}>"
+        )

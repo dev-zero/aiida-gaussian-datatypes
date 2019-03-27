@@ -28,12 +28,14 @@ import re
 from ..utils import SYM2NUM
 
 
-EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
-BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
-N_VAL_EL_MATCH = re.compile(r'^q(\d+)$')
+EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
+BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")
+N_VAL_EL_MATCH = re.compile(r"^q(\d+)$")
 
 
-def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f"), comment=""):
+def write_cp2k_basisset(
+    fhandle, element, name, blocks, fmts=(">#18.12f", "> #14.12f"), comment=""
+):  # pylint: disable=too-many-arguments
     """
     Write the Basis Set to the passed file handle in the format expected by CP2K.
 
@@ -46,21 +48,20 @@ def write_cp2k_basisset(fhandle, element, name, blocks, fmts=(">#18.12f", "> #14
 
     fhandle.write(f"# {comment}\n")
 
-    fhandle.write(
-        f"{element} {name}\n"
-        f"{len(blocks)}\n"  # the number of sets this basis set contains
-        )
+    fhandle.write(f"{element} {name}\n" f"{len(blocks)}\n")  # the number of sets this basis set contains
 
     e_fmt, c_fmt = fmts
 
     for block in blocks:
-        fhandle.write("{n} {lmin} {lmax} {nexp} ".format(
-            n=block['n'], lmin=block['l'][0][0], lmax=block['l'][-1][0], nexp=len(block['coefficients'])
-            ))
-        fhandle.write(" ".join(str(l[1]) for l in block['l']))
+        fhandle.write(
+            "{n} {lmin} {lmax} {nexp} ".format(
+                n=block["n"], lmin=block["l"][0][0], lmax=block["l"][-1][0], nexp=len(block["coefficients"])
+            )
+        )
+        fhandle.write(" ".join(str(l[1]) for l in block["l"]))
         fhandle.write("\n")
 
-        for row in block['coefficients']:
+        for row in block["coefficients"]:
             fhandle.write(f"{row[0]:{e_fmt}}")
             fhandle.write(" ")
             fhandle.write(" ".join(f"{f:{c_fmt}}" for f in row[1:]))
@@ -104,6 +105,8 @@ def parse_single_cp2k_basisset(basis):
     :return:      A dictionary containing the element, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
+    # pylint: disable=too-many-locals
+
     # the first line contains the element and one or more identifiers/names
     identifiers = basis[0].split()
     element = identifiers.pop(0)
@@ -113,7 +116,7 @@ def parse_single_cp2k_basisset(basis):
     identifiers.sort(key=lambda i: -len(i))
 
     name = identifiers.pop(0)
-    tags = name.split('-')
+    tags = name.split("-")
     aliases = [name] + identifiers  # use the remaining identifiers as aliases
 
     n_el = None
@@ -135,8 +138,8 @@ def parse_single_cp2k_basisset(basis):
 
     # the ALL* tags indicate an all-electron basis set, but they might be ambigious,
     # ignore them if we found an explicit #(val.el.) spec already
-    if not n_el and any(kw in tags for kw in ['ALL', 'ALLELECTRON']):
-        n_el = SYM2NUM(element)
+    if not n_el and any(kw in tags for kw in ["ALL", "ALLELECTRON"]):
+        n_el = SYM2NUM[element]
 
     # The second line contains the number of sets, conversion to int ignores any whitespace
     n_blocks = int(basis[1])
@@ -153,20 +156,15 @@ def parse_single_cp2k_basisset(basis):
 
         nline += 1
 
-        blocks.append({
-            "n": qn_n,
-            "l": [(l, nl) for l, nl in zip(range(qn_lmin, qn_lmax+1), ncoeffs)],
-            "coefficients": [[float(c) for c in basis[nline+n].split()] for n in range(nexp)]
-            })
+        blocks.append(
+            {
+                "n": qn_n,
+                "l": [(l, nl) for l, nl in zip(range(qn_lmin, qn_lmax + 1), ncoeffs)],
+                "coefficients": [[float(c) for c in basis[nline + n].split()] for n in range(nexp)],
+            }
+        )
 
         # advance by the number of exponents
         nline += nexp
 
-    return {
-        'element': element,
-        'name': name,
-        'tags': tags,
-        'aliases': aliases,
-        'n_el': n_el,
-        'blocks': blocks,
-        }
+    return {"element": element, "name": name, "tags": tags, "aliases": aliases, "n_el": n_el, "blocks": blocks}

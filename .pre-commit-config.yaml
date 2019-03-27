@@ -1,14 +1,19 @@
 # Install pre-commit hooks via
 # pre-commit install
- 
-# yapf = yet another python formatter
-- repo: https://github.com/pre-commit/mirrors-yapf
-  sha: v0.26.0
-  hooks:
-  - id: yapf
 
-# pylint: THE python linter
-- repo: https://github.com/pre-commit/mirrors-pylint
-  rev: v2.3.1
+# black: automatic formatter
+- repo: https://github.com/ambv/black
+  rev: stable
+  hooks:
+  - id: black
+    language_version: python3.6
+
+# pylint: run from current env to find imported modules
+- repo: local
   hooks:
   - id: pylint
+    name: pylint
+    entry: python -m pylint.__main__ --disable=fixme
+    language: system
+    types: [python]
+    exclude: '^(tests/)|(docs/)|setup\.py'

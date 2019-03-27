@@ -30,8 +30,8 @@ from itertools import chain
 from aiida.common.exceptions import ParsingError
 
 
-EMPTY_LINE_MATCH = re.compile(r'^(\s*|\s*#.*)$')
-BLOCK_MATCH = re.compile(r'^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n')
+EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
+BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")
 
 
 def cp2k_pseudo_file_iter(fhandle):
@@ -47,7 +47,7 @@ def cp2k_pseudo_file_iter(fhandle):
 
     current_pseudo = []
 
-    for line in chain(fhandle, ['Eof marker\n']):
+    for line in chain(fhandle, ["Eof marker\n"]):
         if EMPTY_LINE_MATCH.match(line):
             # ignore empty and comment lines
             continue
@@ -66,6 +66,14 @@ def cp2k_pseudo_file_iter(fhandle):
 
 
 def parse_single_cp2k_pseudo(lines):
+    """
+    Parse a single CP2K pseudopotential entry
+
+    :param lines: List of strings where each string is a line from the original file
+    """
+
+    # pylint: disable=too-many-locals
+
     # the first line contains the element and one or more identifiers/names
     identifiers = lines[0].split()
     element = identifiers.pop(0)
@@ -75,7 +83,7 @@ def parse_single_cp2k_pseudo(lines):
     identifiers.sort(key=lambda i: -len(i))
 
     name = identifiers.pop(0)
-    tags = name.split('-')  # should we also parse the other identifiers for tags?
+    tags = name.split("-")  # should we also parse the other identifiers for tags?
     aliases = [name] + identifiers  # use the remaining identifiers as aliases
 
     # The second line contains the number of electrons for each angular momentum
@@ -85,12 +93,9 @@ def parse_single_cp2k_pseudo(lines):
     #   <radius> <nfuncs> [<func-coeff-1> [<func-coeff-2> ...]]
     r_loc_s, nexp_ppl_s, *cexp_ppl_s = lines[2].split()
 
-    local = {
-        'r': float(r_loc_s),
-        'coeffs': [float(f) for f in cexp_ppl_s]
-        }
+    local = {"r": float(r_loc_s), "coeffs": [float(f) for f in cexp_ppl_s]}
 
-    if int(nexp_ppl_s) != len(local['coeffs']):
+    if int(nexp_ppl_s) != len(local["coeffs"]):
         raise ParsingError("less coefficients found than expected while parsing the block")
 
     nprj = int(lines[3])
@@ -105,7 +110,7 @@ def parse_single_cp2k_pseudo(lines):
         nline += 1
 
         nprj_ppnl = int(nprj_ppnl_s)
-        ncoeffs = nprj_ppnl*(nprj_ppnl+1) // 2  # number of elements in the upper triangular matrix
+        ncoeffs = nprj_ppnl * (nprj_ppnl + 1) // 2  # number of elements in the upper triangular matrix
 
         # the matrix may be distributed over multiple lines, add those values as well
         while len(hprj_ppnl) < ncoeffs:
@@ -118,24 +123,28 @@ def parse_single_cp2k_pseudo(lines):
         if len(hprj_ppnl) > ncoeffs:
             raise ParsingError("unknown format of the non-local projector coefficients")
 
-        prj_ppnl.append({
-            'r': float(r_nprj_s),
-            'nproj': nprj_ppnl,  # store for convenience
-            'coeffs': [float(f) for f in hprj_ppnl],  # upper triangular matrix
-            })
+        prj_ppnl.append(
+            {
+                "r": float(r_nprj_s),
+                "nproj": nprj_ppnl,  # store for convenience
+                "coeffs": [float(f) for f in hprj_ppnl],  # upper triangular matrix
+            }
+        )
 
     return {
-        'element': element,
-        'name': name,
-        'tags': tags,
-        'aliases': aliases,
-        'n_el': n_el,
-        'local': local,
-        'non_local': prj_ppnl,
-        }
+        "element": element,
+        "name": name,
+        "tags": tags,
+        "aliases": aliases,
+        "n_el": n_el,
+        "local": local,
+        "non_local": prj_ppnl,
+    }
 
 
-def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, comment="", fmts=(">#4d", ">#14.8f", "> #14.8f")):
+def write_cp2k_pseudo(
+    fhandle, element, name, n_el, local, non_local, fmts=(">#4d", ">#14.8f", "> #14.8f"), comment=""
+):  # pylint: disable=too-many-arguments
     """
     Write a Gaussian Pseudopotential to file in CP2K format.
 
@@ -147,6 +156,8 @@ def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, comment=""
     :param fmts: Tuple of Python format strings: (integers, radii, coefficients)
     """
 
+    # pylint: disable=too-many-locals
+
     i_fmt, r_fmt, c_fmt = fmts
 
     fhandle.write(f"# {comment}\n")
@@ -156,28 +167,28 @@ def write_cp2k_pseudo(fhandle, element, name, n_el, local, non_local, comment=""
     fhandle.write("\n")
 
     fhandle.write(f"{local['r']:{r_fmt}} {len(local['coeffs']):{i_fmt}} ")
-    fhandle.write(" ".join(f"{c:{c_fmt}}" for c in local['coeffs']))
+    fhandle.write(" ".join(f"{c:{c_fmt}}" for c in local["coeffs"]))
     fhandle.write("\n")
 
     fhandle.write(f"{len(non_local):{i_fmt}}\n")
 
     single_c_len = len("{0:{c_fmt}}".format(0, c_fmt=c_fmt))
 
-    for nl in non_local:
-        r_nproj = f"{nl['r']:{r_fmt}} {nl['nproj']:{i_fmt}} "
+    for nonl in non_local:
+        r_nproj = f"{nonl['r']:{r_fmt}} {nonl['nproj']:{i_fmt}} "
         fhandle.write(r_nproj)
 
-        nlcoeffs = nl['coeffs']
-        nproj = nl['nproj']
+        nlcoeffs = nonl["coeffs"]
+        nproj = nonl["nproj"]
 
         # print the first N (=nproj) coefficients (first row of the matrix)
         fhandle.write(" ".join(f"{c:{c_fmt}}" for c in nlcoeffs[:nproj]))
         fhandle.write("\n")
 
         # for a non-scalar non-empty matrix, print the rest of the coefficients
-        for nrow in range(1, nl['nproj']):
-            fhandle.write(" "*(len(r_nproj) + nrow*(1 + single_c_len)))
-            scol = nrow*nproj - nrow*(nrow-1)//2
+        for nrow in range(1, nonl["nproj"]):
+            fhandle.write(" " * (len(r_nproj) + nrow * (1 + single_c_len)))
+            scol = nrow * nproj - nrow * (nrow - 1) // 2
             ecol = scol + nproj - nrow
             fhandle.write(" ".join(f"{c:{c_fmt}}" for c in nlcoeffs[scol:ecol]))
             fhandle.write("\n")

@@ -26,7 +26,7 @@ SOFTWARE.
 from aiida.orm import Data
 from aiida.common.exceptions import ValidationError
 
-from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
+from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter  # pylint: disable=relative-beyond-top-level
 
 
 class Pseudopotential(Data):
@@ -35,27 +35,28 @@ class Pseudopotential(Data):
     fixme: extend to NLCC pseudos.
     """
 
-    def __init__(self, element=None, name=None, aliases=[], tags=[], n_el=[], local=None, non_local=[], version=1,
-                 **kwargs):
+    def __init__(
+        self, element=None, name=None, aliases=[], tags=[], n_el=[], local=None, non_local=[], version=1, **kwargs
+    ):  # pylint: disable=dangerous-default-value,too-many-arguments
         """
         TODO
         """
 
         super(Pseudopotential, self).__init__(**kwargs)
 
-        if 'dbnode' in kwargs:
+        if "dbnode" in kwargs:
             return  # node was loaded from database
 
-        self.set_attribute('name', name)
-        self.set_attribute('element', element)
-        self.set_attribute('tags', tags)
-        self.set_attribute('aliases', aliases)
-        self.set_attribute('n_el', n_el)
-        self.set_attribute('local', local)
-        self.set_attribute('non_local', non_local)
-        self.set_attribute('version', version)
+        self.set_attribute("name", name)
+        self.set_attribute("element", element)
+        self.set_attribute("tags", tags)
+        self.set_attribute("aliases", aliases)
+        self.set_attribute("n_el", n_el)
+        self.set_attribute("local", local)
+        self.set_attribute("non_local", non_local)
+        self.set_attribute("version", version)
 
-    def store(self, *args, **kwargs):
+    def store(self, *args, **kwargs):  # pylint: disable=arguments-differ
         """
         Store the node, ensuring that the combination (element,name,version) is unique.
         """
@@ -68,9 +69,10 @@ class Pseudopotential(Data):
         except NotExistent:
             pass
         else:
-            raise UniquenessError("Gaussian Pseudopotential already exists for"
-                                  " element={b.element}, name={b.name}, version={b.version}: {uuid}"
-                                  .format(uuid=existing.uuid, b=self))
+            raise UniquenessError(
+                f"Gaussian Pseudopotential already exists for"
+                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
+            )
 
         return super(Pseudopotential, self).store(*args, **kwargs)
 
@@ -79,6 +81,7 @@ class Pseudopotential(Data):
 
         from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA
 
+        # fmt: off
         schema = Schema({
             'name': str,
             'element': str,
@@ -96,14 +99,15 @@ class Pseudopotential(Data):
                 }],
             'version': int,
             }, extra=ALLOW_EXTRA, required=True)
+        # fmt: on
 
         try:
             schema(self.attributes)
         except MultipleInvalid as exc:
             raise ValidationError(str(exc))
 
-        for nlocal in self.attributes['non_local']:
-            if len(nlocal['coeffs']) != nlocal['nproj']*(nlocal['nproj']+1) // 2:
+        for nlocal in self.attributes["non_local"]:
+            if len(nlocal["coeffs"]) != nlocal["nproj"] * (nlocal["nproj"] + 1) // 2:
                 raise ValidationError("invalid number of coefficients for non-local projection")
 
     @property
@@ -113,7 +117,7 @@ class Pseudopotential(Data):
 
         :rtype: str
         """
-        return self.get_attribute('element', None)
+        return self.get_attribute("element", None)
 
     @property
     def name(self):
@@ -122,7 +126,7 @@ class Pseudopotential(Data):
 
         :rtype: str
         """
-        return self.get_attribute('name', None)
+        return self.get_attribute("name", None)
 
     @property
     def aliases(self):
@@ -131,7 +135,7 @@ class Pseudopotential(Data):
 
         :rtype: []
         """
-        return self.get_attribute('aliases', [])
+        return self.get_attribute("aliases", [])
 
     @property
     def tags(self):
@@ -140,7 +144,7 @@ class Pseudopotential(Data):
 
         :rtype: []
         """
-        return self.get_attribute('tags', [])
+        return self.get_attribute("tags", [])
 
     @property
     def version(self):
@@ -149,7 +153,7 @@ class Pseudopotential(Data):
 
         :rtype: int
         """
-        return self.get_attribute('version', None)
+        return self.get_attribute("version", None)
 
     @property
     def n_el(self):
@@ -158,7 +162,7 @@ class Pseudopotential(Data):
         :rtype:list
         """
 
-        return self.get_attribute('n_el', [])
+        return self.get_attribute("n_el", [])
 
     @property
     def local(self):
@@ -172,7 +176,7 @@ class Pseudopotential(Data):
 
         :rtype:dict
         """
-        return self.get_attribute('local', None)
+        return self.get_attribute("local", None)
 
     @property
     def non_local(self):
@@ -187,10 +191,10 @@ class Pseudopotential(Data):
 
         :rtype:list
         """
-        return self.get_attribute('non_local', [])
+        return self.get_attribute("non_local", [])
 
     @classmethod
-    def get(cls, element, name=None, version='latest', match_aliases=True):
+    def get(cls, element, name=None, version="latest", match_aliases=True):  # pylint: disable=arguments-differ
         """
         Get the first matching Pseudopotential for the given parameters.
 
@@ -202,34 +206,32 @@ class Pseudopotential(Data):
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
-        filters = {
-            'attributes.element': {'==': element},
-            }
+        filters = {"attributes.element": {"==": element}}
 
-        if version != 'latest':
-            filters['attributes.version'] = {'==': version}
+        if version != "latest":
+            filters["attributes.version"] = {"==": version}
 
         if match_aliases:
-            filters['attributes.aliases'] = {'contains': [name]}
+            filters["attributes.aliases"] = {"contains": [name]}
         else:
-            filters['attributes.name'] = {'==': name}
+            filters["attributes.name"] = {"==": name}
 
         query = QueryBuilder()
         query.append(Pseudopotential)
         query.add_filter(Pseudopotential, filters)
-        query.order_by({Pseudopotential: [{'attributes.version': {'cast': 'i', 'order': 'desc'}}]})
+        query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
 
         existing = query.first()
 
         if not existing:
-            raise NotExistent("No Gaussian Pseudopotential found for"
-                              " element={element}, name={name}, version={version}"
-                              .format(element=element, name=name, version=version))
+            raise NotExistent(
+                f"No Gaussian Pseudopotential found for element={element}, name={name}, version={version}"
+            )
 
         return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters, duplicate_handling='ignore'):
+    def from_cp2k(cls, fhandle, filters, duplicate_handling="ignore"):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in CP2K format
 
@@ -246,7 +248,7 @@ class Pseudopotential(Data):
 
         def exists(pseudo):
             try:
-                cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+                cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
             except NotExistent:
                 return False
 
@@ -254,31 +256,32 @@ class Pseudopotential(Data):
 
         pseudos = [p for p in cp2k_pseudo_file_iter(fhandle) if matches_criteria(p)]
 
-        if duplicate_handling == 'ignore':  # simply filter duplicates
+        if duplicate_handling == "ignore":  # simply filter duplicates
             pseudos = [p for p in pseudos if not exists(p)]
 
-        elif duplicate_handling == 'error':
+        elif duplicate_handling == "error":
             for pseudo in pseudos:
                 try:
-                    latest = cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+                    latest = cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
                 except NotExistent:
                     pass
                 else:
-                    raise UniquenessError("Gaussian Pseudopotential already exists for"
-                                          " element={element}, name={name}: {uuid}"
-                                          .format(uuid=latest.uuid, **pseudo))
+                    raise UniquenessError(
+                        f"Gaussian Pseudopotential already exists for"
+                        " element={pseudo.element}, name={pseudo.name}: {latest.uuid}"
+                    )
 
-        elif duplicate_handling == 'new':
+        elif duplicate_handling == "new":
             for pseudo in pseudos:
                 try:
-                    latest = cls.get(pseudo['element'], pseudo['name'], match_aliases=False)
+                    latest = cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
                 except NotExistent:
                     pass
                 else:
-                    pseudo['version'] = latest.version + 1
+                    pseudo["version"] = latest.version + 1
 
         else:
-            raise ValueError("Specified duplicate handling strategy not recognized: '{}'".format(duplicate_handling))
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**p) for p in pseudos]
 
@@ -288,6 +291,12 @@ class Pseudopotential(Data):
 
         :param fhandle: open file handle
         """
-        write_cp2k_pseudo(fhandle,
-                          self.element, self.name, self.n_el, self.local, self.non_local,
-                          comment=f"from AiiDA Pseudopotential<uuid: {self.uuid}>")
+        write_cp2k_pseudo(
+            fhandle,
+            self.element,
+            self.name,
+            self.n_el,
+            self.local,
+            self.non_local,
+            comment=f"from AiiDA Pseudopotential<uuid: {self.uuid}>",
+        )
