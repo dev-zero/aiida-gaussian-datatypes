@@ -26,7 +26,7 @@ SOFTWARE.
 from aiida.orm import Data
 from aiida.common.exceptions import ValidationError
 
-from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter  # pylint: disable=relative-beyond-top-level
+from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
 
 class Pseudopotential(Data):
@@ -36,11 +36,32 @@ class Pseudopotential(Data):
     """
 
     def __init__(
-        self, element=None, name=None, aliases=[], tags=[], n_el=[], local=None, non_local=[], version=1, **kwargs
-    ):  # pylint: disable=dangerous-default-value,too-many-arguments
+        self,
+        element=None,
+        name=None,
+        aliases=None,
+        tags=None,
+        n_el=None,
+        local=None,
+        non_local=None,
+        version=1,
+        **kwargs,
+    ):
         """
         TODO
         """
+
+        if not aliases:
+            aliases = []
+
+        if not tags:
+            tags = []
+
+        if not n_el:
+            n_el = []
+
+        if not non_local:
+            non_local = []
 
         super(Pseudopotential, self).__init__(**kwargs)
 
@@ -56,7 +77,7 @@ class Pseudopotential(Data):
         self.set_attribute("non_local", non_local)
         self.set_attribute("version", version)
 
-    def store(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def store(self, *args, **kwargs):
         """
         Store the node, ensuring that the combination (element,name,version) is unique.
         """
@@ -194,7 +215,7 @@ class Pseudopotential(Data):
         return self.get_attribute("non_local", [])
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True):  # pylint: disable=arguments-differ
+    def get(cls, element, name=None, version="latest", match_aliases=True):
         """
         Get the first matching Pseudopotential for the given parameters.
 
