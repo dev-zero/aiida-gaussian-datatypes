@@ -3,6 +3,7 @@ language: python
 python:
   - '3.6'
   - '3.7'
+cache: pip
 install:
   - pip install 'pip<19' # workaround until AiiDA adopts reentry-1.3.x
   - pip install .[pre-commit]
