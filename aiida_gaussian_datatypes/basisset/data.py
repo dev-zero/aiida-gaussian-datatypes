@@ -34,9 +34,7 @@ class BasisSet(Data):
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
 
-    def __init__(
-        self, element=None, name=None, aliases=[], tags=[], n_el=None, blocks=[], version=1, **kwargs
-    ):  # pylint: disable=dangerous-default-value,too-many-arguments
+    def __init__(self, element=None, name=None, aliases=None, tags=None, n_el=None, blocks=None, version=1, **kwargs):
         """
         :param element: string containing the name of the element
         :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
@@ -45,6 +43,15 @@ class BasisSet(Data):
         :param orbital_quantum_numbers: see :py:attr:`~orbitalquantumnumbers`
         :param coefficients: see :py:attr:`~coefficients`
         """
+
+        if not aliases:
+            aliases = []
+
+        if not tags:
+            tags = []
+
+        if not blocks:
+            blocks = []
 
         super(BasisSet, self).__init__(**kwargs)
 
@@ -59,7 +66,7 @@ class BasisSet(Data):
         self.set_attribute("blocks", blocks)
         self.set_attribute("version", version)
 
-    def store(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def store(self, *args, **kwargs):
         """
         Store the node, ensuring that the combination (element,name,version) is unique.
         """
@@ -187,7 +194,7 @@ class BasisSet(Data):
         return self.get_attribute("blocks", [])
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True):  # pylint: disable=arguments-differ
+    def get(cls, element, name=None, version="latest", match_aliases=True):
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
