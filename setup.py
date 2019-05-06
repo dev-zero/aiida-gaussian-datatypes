@@ -22,5 +22,5 @@ if __name__ == "__main__":
         packages=find_packages(),
         long_description=get_long_description(),
         long_description_content_type="text/markdown",
-        **kwargs
+        **kwargs,
     )
