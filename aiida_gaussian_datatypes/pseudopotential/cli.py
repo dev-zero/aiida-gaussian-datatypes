@@ -170,7 +170,7 @@ def list_pseudos(sym, name, tags):
         echo.echo("No Gaussian Pseudopotentials found.")
         return
 
-    echo.echo_info("{} Gaussian Pseudopotential founds:\n".format(query.count()))
+    echo.echo_info("{} Gaussian Pseudopotential found:\n".format(query.count()))
     echo.echo(_formatted_table_list(pseudo for [pseudo] in query.iterall()))
     echo.echo("")
 
