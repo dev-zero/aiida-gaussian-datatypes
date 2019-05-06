@@ -6,7 +6,7 @@
   rev: stable
   hooks:
   - id: black
-    language_version: python3.6
+    language_version: python3
 
 # pylint: run from current env to find imported modules
 - repo: local
