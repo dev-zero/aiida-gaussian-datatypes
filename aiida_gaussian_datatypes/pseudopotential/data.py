@@ -219,9 +219,12 @@ class Pseudopotential(Data):
         query = QueryBuilder()
         query.append(Pseudopotential)
         query.add_filter(Pseudopotential, filters)
-        query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
 
-        existing = query.first()
+        # SQLA ORM only solution:
+        # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
+        # existing = query.first()
+
+        existing = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)[0] if query.count() else []
 
         if not existing:
             raise NotExistent(

@@ -204,9 +204,12 @@ class BasisSet(Data):
         query = QueryBuilder()
         query.append(BasisSet)
         query.add_filter(BasisSet, filters)
-        query.order_by({BasisSet: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
 
-        existing = query.first()
+        # SQLA ORM only solution:
+        # query.order_by({BasisSet: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
+        # existing = query.first()
+
+        existing = sorted(query.iterall(), key=lambda b: b[0].version, reverse=True)[0] if query.count() else []
 
         if not existing:
             raise NotExistent(f"No Gaussian Basis Set found for element={element}, name={name}, version={version}")
