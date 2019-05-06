@@ -217,7 +217,7 @@ class BasisSet(Data):
         return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters, duplicate_handling="ignore"):
+    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
         """
         Constructs a list with basis set objects from a Basis Set in CP2K format
 
@@ -228,6 +228,9 @@ class BasisSet(Data):
         """
 
         from aiida.common.exceptions import UniquenessError, NotExistent
+
+        if not filters:
+            filters = {}
 
         def matches_criteria(bset):
             return all(fspec(bset[field]) for field, fspec in filters.items())

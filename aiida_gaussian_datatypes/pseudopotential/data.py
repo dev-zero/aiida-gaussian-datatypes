@@ -234,7 +234,7 @@ class Pseudopotential(Data):
         return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters, duplicate_handling="ignore"):
+    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in CP2K format
 
@@ -245,6 +245,9 @@ class Pseudopotential(Data):
         """
 
         from aiida.common.exceptions import UniquenessError, NotExistent
+
+        if not filters:
+            filters = {}
 
         def matches_criteria(pseudo):
             return all(fspec(pseudo[field]) for field, fspec in filters.items())
