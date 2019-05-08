@@ -1,21 +1,21 @@
 dist: xenial
 language: python
 python:
-  - '3.6'
-  - '3.7'
+- '3.6'
+- '3.7'
 cache: pip
 install:
-  - pip install 'pip<19' # workaround until AiiDA adopts reentry-1.3.x
-  - pip install .[pre-commit]
-  - pre-commit install --install-hooks
+- pip install 'pip<19'  # workaround until AiiDA adopts reentry-1.3.x
+- pip install .[pre-commit]
+- pre-commit install --install-hooks
 script:
-  - pre-commit run -a
-  - pytest -v
+- pre-commit run -a
+- pytest -v
 deploy:
   provider: pypi
   user: dev-zero
   password:
-    secure: Hb3VZ1iQEMB4O/LbSfT3dA1MlCbymtb5NA10oJsr6CYLGw2mBTcRNuj7cIzS85T2nYq8O8MLDLg8aGb3MR+Ot9Wy2CfQuLx8ifFxZDyB6xTK8zcOldJg8nUAhi3gIDgYXKDfoFcP5Fpy8tqYvDifl8fhM1zjJ0AkqBSZCd/70qUiBDkRG7lrJ8wIDLKarsmHN6PsjRUz/TcugFYWEPmfYqs7tzpQu7HLuBN/aoVLZDUHOwXHYbx8KshiM9SZDiwu3y5XhnSXqt0xVVbolkTT2dxRs08towzKpllCWlLNYu1f3A91gqjaciTkquKdKt31bkV+6wERpIZqAzt3NjbQ2Bh2AcFBRyYQI0P/CON/2FcXeoAMAHpHLXwR5P1S2sv89QMxEpa0aX4548dkQt4hHN11B6gyseG3HfFqlE1UGrLL+icSRAjMxkyvnH394AymQzLtr+Y906kZ8ey1FzAkqx+Jmc9ThzmcGSqQVb+MzYZ4ciLS8uvvzY56wR2Y3CFJiSwPjiGaO9rzgEM2pjgB8gVeRNX5q5PcvGms+gl5XEKa3pd5z4MfZ3B3GZQBFz25fYynnKashnIDp2C4RoOrKTBD8WflA4J8C134bPXqTVqdq6WsCQSuNygLvaQ3x8Slx9YS0KIPdHl7eWlcbVp1Ef8FQowc179xbj5s+Emxd8o=
+    secure: bSHHdPQiW0va/9UHLG8m/LzA2Vdc20MjAA9a/gZ+aSp6DqQEnOUzj8vDoVw7zTg3wWtHqY9Gd3SLzl89qUH3l7fIF31wVJ8M8O6blaFYK+R1KKc6J8DgZW1mMcxlnlrrWBbuAJTzMa1KJyF2JThTNr2skdbfnJeDJzTRL6xqLlIqGB1OUmNzy4PVefJHzUQ/OHz90ffG3YKY/zUzqCH098nkfWlRI2d3zMRhwcwA+7HQbc3iDBppwfBzhmizBTQAxAAQ3GWhZG5yB+f/hgEQaK15j7Hd5EYabfLuZRdibBVYtw8ANT4jLj1zmMZdUlzfCnpdC2mv22KJEqJXCiW0CFz2GFASjmcVlMa4g/1+ZKGGPmezCYh6GF47yErTSZ/RrhPhnEuepEp1md4YLZznfAt3iQWIAW1fng0+yy90wCYBrj//Xr0ry/OAKRRKvHJ6LSu8bez0L8agrm2MLCO9vW55LJrB2PMzT9Va+gE8FpNkuc7kPQhKoPl6rPnT0JhDCCV6YpoyKWU1NOUhn7/iRzso4e297jVbcHLI3GCziWLyvLgCU+S15/V6CsJxHsbfI8LsiYZ8RBU+aiCZtCNosT4p5ELg8iH9JlrUXQ03wLgduuKY43BMjR53rROuhXr8Ghb3QOTK4Vch05z4gE1tN9G9GzOMo1VaSesey71SoAI=
   on:
     tags: true
   distributions: sdist bdist_wheel
