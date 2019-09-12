@@ -9,7 +9,9 @@ install:
 - pre-commit install --install-hooks
 script:
 - pre-commit run -a
-- pytest -v
+- pytest -v --cov-report xml --cov-report term-missing --cov-append --cov aiida_gaussian_datatypes tests/
+after_success:
+- codecov
 deploy:
   provider: pypi
   user: dev-zero
