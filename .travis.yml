@@ -5,7 +5,7 @@ python:
 - '3.7'
 cache: pip
 install:
-- pip install .[pre-commit]
+- pip install .[pre-commit,testing,docs]
 - pre-commit install --install-hooks
 script:
 - pre-commit run -a
