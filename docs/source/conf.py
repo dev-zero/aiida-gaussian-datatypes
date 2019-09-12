@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 #
+# Sphinx configuration for aiida-gaussian-datatypes
+#
 # This file is execfile()d with the current directory set to its
 # containing dir.
 #
@@ -12,11 +14,39 @@
 import os
 import sys
 import time
+import aiida_gaussian_datatypes
+
+# -- AiiDA-related setup --------------------------------------------------
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
-import aiida_gaussian_datatypes
+
+# Enable rtd mode via `export READTHEDOCS=True`
+on_rtd = os.environ.get("READTHEDOCS", None) == "True"
+
+if not on_rtd:  # only import and set the theme if we're building docs locally
+    try:
+        import sphinx_rtd_theme
+
+        html_theme = "sphinx_rtd_theme"
+        html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+    except ImportError:
+        # No sphinx_rtd_theme installed
+        pass
+    # Load the database environment by first loading the profile and then loading the backend through the manager
+    from aiida.manage.configuration import get_config, load_profile
+    from aiida.manage.manager import get_manager
+
+    config = get_config()
+    load_profile(config.default_profile_name)
+    get_manager().get_backend()
+else:
+    # Back-end settings for readthedocs online documentation.
+    from aiida.manage import configuration
+
+    configuration.IN_RT_DOC_MODE = True
+    configuration.BACKEND = "django"
 
 # -- General configuration ------------------------------------------------
 
@@ -35,8 +65,8 @@ extensions = [
 ]
 
 intersphinx_mapping = {
-    "python": ("https://docs.python.org/2.7", None),
-    "aiida": ("http://aiida_core.readthedocs.io/en/latest/", None),
+    "python": ("https://docs.python.org/3.6", None),
+    "aiida": ("http://aiida-core.readthedocs.io/en/latest/", None),
 }
 
 nitpick_ignore = [("py:obj", "module")]
@@ -55,14 +85,15 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = "aiida-gaussian-datayptes"
-copyright_first_year = 2018
+project = "aiida-gaussian-datatypes"
+copyright_first_year = "2018"
 copyright_owners = "University of Zurich, Switzerland"
 
-current_year = time.localtime().tm_year
+current_year = str(time.localtime().tm_year)
 copyright_year_string = (
     current_year if current_year == copyright_first_year else "{}-{}".format(copyright_first_year, current_year)
 )
+# pylint: disable=redefined-builtin
 copyright = "{}, {}. All rights reserved".format(copyright_year_string, copyright_owners)
 
 # The version info for the project you're documenting, acts as replacement for
@@ -115,7 +146,6 @@ pygments_style = "sphinx"
 
 # If true, keep warnings as "system message" paragraphs in the built documents.
 # keep_warnings = False
-
 
 # -- Options for HTML output ----------------------------------------------
 
@@ -198,7 +228,7 @@ html_show_sourcelink = False
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
 # base URL from which the finished HTML is served.
-html_use_opensearch = "http://aiida-plugin-template.readthedocs.io"
+html_use_opensearch = "http://aiida-gaussian-datatypes.readthedocs.io"
 
 # This is the file name suffix for HTML files (e.g. ".xhtml").
 # html_file_suffix = None
@@ -218,7 +248,7 @@ html_search_language = "en"
 # html_search_scorer = 'scorer.js'
 
 # Output file base name for HTML help builder.
-htmlhelp_basename = "aiida-plugin-template-doc"
+htmlhelp_basename = "aiida-gaussian-datatypes-doc"
 
 # -- Options for LaTeX output ---------------------------------------------
 
@@ -260,6 +290,42 @@ latex_elements = {
 # latex_domain_indices = True
 
 
+def run_apidoc(_):
+    """Runs sphinx-apidoc when building the documentation.
+
+    Needs to be done in conf.py in order to include the APIdoc in the
+    build on readthedocs.
+
+    See also https://github.com/rtfd/readthedocs.org/issues/1139
+    """
+    source_dir = os.path.abspath(os.path.dirname(__file__))
+    apidoc_dir = os.path.join(source_dir, "apidoc")
+    package_dir = os.path.join(source_dir, os.pardir, os.pardir, "aiida_gaussian_datatypes")
+
+    # In #1139, they suggest the route below, but this ended up
+    # calling sphinx-build, not sphinx-apidoc
+    # from sphinx.apidoc import main
+    # main([None, '-e', '-o', apidoc_dir, package_dir, '--force'])
+
+    import subprocess
+
+    cmd_path = "sphinx-apidoc"
+    if hasattr(sys, "real_prefix"):  # Check to see if we are in a virtualenv
+        # If we are, assemble the path manually
+        cmd_path = os.path.abspath(os.path.join(sys.prefix, "bin", "sphinx-apidoc"))
+
+    options = ["-o", apidoc_dir, package_dir, "--private", "--force", "--no-toc"]
+
+    # See https://stackoverflow.com/a/30144019
+    env = os.environ.copy()
+    env["SPHINX_APIDOC_OPTIONS"] = "members,special-members,private-members,undoc-members,show-inheritance"
+    subprocess.check_call([cmd_path] + options, env=env)
+
+
+def setup(app):
+    app.connect("builder-inited", run_apidoc)
+
+
 # -- Options for manual page output ---------------------------------------
 
 # One entry per manual page. List of tuples
@@ -269,7 +335,6 @@ latex_elements = {
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
-
 
 # -- Options for Texinfo output -------------------------------------------
 
@@ -290,45 +355,6 @@ latex_elements = {
 
 # If true, do not generate a @detailmenu in the "Top" node's menu.
 # texinfo_no_detailmenu = False
-
-
-## BEFORE STARTING, LET'S LOAD THE CORRECT AIIDA DBENV
-# on_rtd is whether we are on readthedocs.org, this line of code grabbed
-# from docs.readthedocs.org
-# NOTE: it is needed to have these lines before load_dbenv()
-on_rtd = os.environ.get("READTHEDOCS", None) == "True"
-
-sys.path.append(os.path.join(os.path.split(__file__)[0], os.pardir, os.pardir))
-sys.path.append(os.path.join(os.path.split(__file__)[0], os.pardir))
-
-os.environ["DJANGO_SETTINGS_MODULE"] = "rtd_settings"
-
-if not on_rtd:  # only import and set the theme if we're building docs locally
-    try:
-        import sphinx_rtd_theme
-
-        html_theme = "sphinx_rtd_theme"
-        html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
-    except ImportError:
-        # No sphinx_rtd_theme installed
-        pass
-    # Loading the dbenv. The backend should be fixed before compiling the
-    # documentation.
-    from aiida.backends.utils import load_dbenv, is_dbenv_loaded
-
-    if not is_dbenv_loaded():
-        load_dbenv()
-else:
-    # Back-end settings for readthedocs online documentation -
-    # we don't want to create a profile there
-    from aiida.backends import settings
-
-    settings.IN_DOC_MODE = True
-    settings.BACKEND = "django"
-    settings.AIIDADB_PROFILE = "default"
-
-# make sphinx' autodoc feature also extract __init__
-autodoc_default_options = {"special-members": "__init__"}
 
 # Warnings to ignore when using the -n (nitpicky) option
 # We should ignore any python built-in exception, for instance

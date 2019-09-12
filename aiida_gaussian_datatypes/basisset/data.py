@@ -1,26 +1,9 @@
 # -*- coding: utf-8 -*-
+# Copyright (c), Tiziano Müller
+# SPDX-License-Identifier: MIT
+
 """
 Gaussian Basis Set Data Class
-
-Copyright (c), Tiziano Müller
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 """
 
 from aiida.orm import Data
@@ -40,8 +23,8 @@ class BasisSet(Data):
         :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
         :param aliases: alternative names
         :param tags: additional tags
-        :param orbital_quantum_numbers: see :py:attr:`~orbitalquantumnumbers`
-        :param coefficients: see :py:attr:`~coefficients`
+        :param n_el: number of valence electrons covered by this basis set
+        :param blocks: see :py:attr:`~blocks`
         """
 
         if not aliases:
@@ -160,7 +143,7 @@ class BasisSet(Data):
     @property
     def n_el(self):
         """
-        number of valence electron covered by this basis set
+        number of valence electrons covered by this basis set
 
         :rtype: int
         """

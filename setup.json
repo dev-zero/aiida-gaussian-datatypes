@@ -34,7 +34,7 @@
             "pre-commit >= 1.18.3"
         ],
         "docs": [
-            "sphinx >= 2.2.0",
+            "sphinx >= 2.1.0,<2.2.0",
             "sphinx-click >= 2.2.0"
         ]
     }
