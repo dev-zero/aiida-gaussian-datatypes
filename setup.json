@@ -6,8 +6,14 @@
     "url": "https://github.com/dev-zero/aiida-gaussian-datatypes",
     "license": "MIT License",
     "classifiers": [
-        "Programming Language :: Python",
-        "License :: OSI Approved :: MIT License"
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Development Status :: 4 - Beta",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        "Topic :: Scientific/Engineering :: Chemistry",
+        "Intended Audience :: Science/Research",
     ],
     "version": "0.2.2",
     "entry_points": {
