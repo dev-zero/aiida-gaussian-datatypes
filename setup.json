@@ -23,19 +23,19 @@
     "scripts": [],
     "reentry_register": true,
     "install_requires": [
-        "voluptuous >= 0.11.5",
-        "aiida-core >= 1.0.0b2"
+        "voluptuous >= 0.11.7",
+        "aiida-core >= 1.0.0b6"
     ],
     "extras_require": {
         "testing": [
             "aiida-core[testing]"
         ],
         "pre-commit": [
-            "pre-commit"
+            "pre-commit >= 1.18.3"
         ],
         "docs": [
-            "sphinx >= 1.8b1",
-            "sphinx-click >= 1.4.0"
+            "sphinx >= 2.2.0",
+            "sphinx-click >= 2.2.0"
         ]
     }
 }
