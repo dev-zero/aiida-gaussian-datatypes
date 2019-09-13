@@ -3,9 +3,20 @@ language: python
 python:
 - '3.6'
 - '3.7'
+services:
+- postgresql
+- rabbitmq
+addons:
+  postgresql: "9.6"
+env:
+  global:
+  - TEST_AIIDA_BACKEND: django
+  # show timings of tests
+  - PYTEST_ADDOPTS: --durations=0
 cache: pip
 install:
 - pip install .[pre-commit,testing,docs]
+- reentry scan -r aiida
 - pre-commit install --install-hooks
 script:
 - pre-commit run -a
