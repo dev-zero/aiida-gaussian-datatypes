@@ -93,7 +93,7 @@ Notes:
 To reference this in a `verdi` script, you can use the following snippet:
 
 ```python
-from aiida.orm import DataFactory
+from aiida.plugins import DataFactory
 
 BasisSet = DataFactory('gaussian.basisset')
 
@@ -140,7 +140,7 @@ Notes:
 To reference this in a `verdi` script, you can use the following snippet:
 
 ```python
-from aiida.orm import DataFactory
+from aiida.plugins import DataFactory
 
 Pseudopotential = DataFactory('gaussian.pseudo')
 

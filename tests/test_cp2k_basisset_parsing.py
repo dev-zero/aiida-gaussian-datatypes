@@ -4,6 +4,8 @@ from six.moves import cStringIO as StringIO
 
 from aiida_gaussian_datatypes.basisset.utils import parse_single_cp2k_basisset, write_cp2k_basisset
 
+from . import TEST_DIR
+
 
 class CP2KBasisSetParsingTest(unittest.TestCase):
     def test_single_parse(self):
@@ -51,7 +53,7 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
 
     def test_roundtrip_single(self):
 
-        with open("tests/BASIS_MOLOPT.H", "r") as fhandle:
+        with open(TEST_DIR.joinpath("BASIS_MOLOPT.H"), "r") as fhandle:
             content = fhandle.read()
 
         parsed = parse_single_cp2k_basisset(content.splitlines())
@@ -67,7 +69,7 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
 
     def test_roundtrip_multi_shell(self):
 
-        with open("tests/BASIS_pob-TZVP.H", "r") as fhandle:
+        with open(TEST_DIR.joinpath("BASIS_pob-TZVP.H"), "r") as fhandle:
             content = fhandle.read()
 
         parsed = parse_single_cp2k_basisset(content.splitlines())
