@@ -23,3 +23,13 @@ def test_lookup():
 
     basis_H = BasisSet.get(element="H", name="SZV-MOLOPT-GTH")
     assert basis_H
+
+
+def test_n_orbital_functions():
+    BasisSet = DataFactory("gaussian.basisset")
+
+    with open(TEST_DIR.joinpath("BASIS_MOLOPT.Hf"), "r") as fhandle:
+        bsets = BasisSet.from_cp2k(fhandle)
+
+    assert bsets
+    assert bsets[0].n_orbital_functions == 1 * 3 + 3 * 2 + 5 * 2 + 7 * 1  # l=0,1,2,3 with respective nshells=3,2,2,1
