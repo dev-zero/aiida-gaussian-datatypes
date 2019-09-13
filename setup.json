@@ -15,7 +15,7 @@
         "Topic :: Scientific/Engineering :: Chemistry",
         "Intended Audience :: Science/Research"
     ],
-    "version": "0.2.3",
+    "version": "0.3.0",
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
