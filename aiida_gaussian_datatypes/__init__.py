@@ -3,4 +3,4 @@
 Provides datatypes and click-based CLIs to store, manage and retrieve Gaussian Basis Sets and Pseudopotentials.
 """
 
-__version__ = "0.2.3"
+__version__ = "0.3.0"

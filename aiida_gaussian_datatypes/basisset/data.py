@@ -176,6 +176,20 @@ class BasisSet(Data):
 
         return self.get_attribute("blocks", [])
 
+    @property
+    def n_orbital_functions(self):
+        """
+        Return the number of orbital functions from this basis set
+        """
+
+        norbfuncs = 0
+
+        for block in self.blocks:
+            # for each l quantum number we get number of m quantum numbers times number of "shells" MOs
+            norbfuncs += sum((2 * l + 1) * nshells for l, nshells in block["l"])
+
+        return norbfuncs
+
     @classmethod
     def get(cls, element, name=None, version="latest", match_aliases=True):
         from aiida.orm.querybuilder import QueryBuilder

@@ -15,7 +15,7 @@
         "Topic :: Scientific/Engineering :: Chemistry",
         "Intended Audience :: Science/Research"
     ],
-    "version": "0.2.3",
+    "version": "0.3.0",
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
@@ -36,7 +36,8 @@
         "testing": [
             "pytest >= 5.1.2",
             "pytest-cov >= 2.7.1",
-            "codecov >= 2.0.15"
+            "codecov >= 2.0.15",
+            "pgtest >= 1.2.0"
         ],
         "pre-commit": [
             "pre-commit >= 1.18.3"
