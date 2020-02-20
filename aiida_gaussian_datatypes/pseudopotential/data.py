@@ -7,7 +7,6 @@ Gaussian Pseudopotential Data class
 """
 
 from aiida.orm import Data
-from aiida.common.exceptions import ValidationError
 
 from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
@@ -48,9 +47,6 @@ class Pseudopotential(Data):
 
         super(Pseudopotential, self).__init__(**kwargs)
 
-        if "dbnode" in kwargs:
-            return  # node was loaded from database
-
         self.set_attribute("name", name)
         self.set_attribute("element", element)
         self.set_attribute("tags", tags)
@@ -84,6 +80,7 @@ class Pseudopotential(Data):
         super(Pseudopotential, self)._validate()
 
         from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA
+        from aiida.common.exceptions import ValidationError
 
         # fmt: off
         schema = Schema({
