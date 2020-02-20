@@ -37,8 +37,7 @@
         "testing": [
             "pytest ~= 3.6,<5.0.0",
             "pytest-cov",
-            "codecov >= 2.0.15",
-            "coverage"
+            "codecov >= 2.0.15"
         ],
         "pre-commit": [
             "pre-commit >= 2.0.1"
