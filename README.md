@@ -1,6 +1,6 @@
 # AiiDA Gaussian Data Plugin
 
-[![Build Status](https://travis-ci.com/dev-zero/aiida-gaussian-datatypes.svg?branch=develop)](https://travis-ci.com/dev-zero/aiida-gaussian-datatypes) [![codecov](https://codecov.io/gh/dev-zero/aiida-gaussian-datatypes/branch/develop/graph/badge.svg)](https://codecov.io/gh/dev-zero/aiida-gaussian-datatypes) [![PyPI](https://img.shields.io/pypi/pyversions/aiida-gaussian-datatypes)](https://pypi.org/project/aiida-gaussian-datatypes/)
+[![tests](https://github.com/dev-zero/aiida-gaussian-datatypes/workflows/tests/badge.svg)](https://github.com/dev-zero/aiida-gaussian-datatypes/actions) [![codecov](https://codecov.io/gh/dev-zero/aiida-gaussian-datatypes/branch/develop/graph/badge.svg)](https://codecov.io/gh/dev-zero/aiida-gaussian-datatypes) [![PyPI](https://img.shields.io/pypi/pyversions/aiida-gaussian-datatypes)](https://pypi.org/project/aiida-gaussian-datatypes/)
 
 
 Plugin to handle GTO-based basis sets and pseudopotentials and manage them as first-class citizens in AiiDA.

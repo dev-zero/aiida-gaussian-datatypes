@@ -7,7 +7,6 @@ Gaussian Basis Set Data Class
 """
 
 from aiida.orm import Data
-from aiida.common.exceptions import ValidationError
 
 from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
 
@@ -37,9 +36,6 @@ class BasisSet(Data):
             blocks = []
 
         super(BasisSet, self).__init__(**kwargs)
-
-        if "dbnode" in kwargs:
-            return  # node was loaded from database
 
         self.set_attribute("name", name)
         self.set_attribute("element", element)
@@ -73,6 +69,7 @@ class BasisSet(Data):
         super(BasisSet, self)._validate()
 
         from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Any, Length
+        from aiida.common.exceptions import ValidationError
 
         # fmt: off
         schema = Schema({
@@ -260,7 +257,8 @@ class BasisSet(Data):
                     pass
                 else:
                     raise UniquenessError(
-                        f"Gaussian Basis Set already exists for element={bset.element}, name={bset.name}: {latest.uuid}"
+                        f"Gaussian Basis Set already exists for"
+                        f" element={bset['element']}, name={bset['name']}: {latest.uuid}"
                     )
 
         elif duplicate_handling == "new":

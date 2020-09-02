@@ -80,7 +80,7 @@ def cli():
     help="Whether duplicates should be ignored, produce an error or uploaded as new version")
 # fmt: on
 @decorators.with_dbenv()
-def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates):
+def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates):
     """
     Add a pseudopotential from a file to the database
     """
@@ -130,7 +130,7 @@ def import_pseudopotential(pseudopotential_file, fformat, sym, tags, duplicates)
 @click.option(
     'tags', '--tag', '-t', multiple=True, help="filter by a tag (all tags must be present if specified multiple times)")
 @decorators.with_dbenv()
-def list_pseudos(sym, name, tags):
+def list_pseudo(sym, name, tags):
     """
     List Gaussian Pseudopotentials
     """
@@ -153,7 +153,7 @@ def list_pseudos(sym, name, tags):
         echo.echo("No Gaussian Pseudopotentials found.")
         return
 
-    echo.echo_info("{} Gaussian Pseudopotential found:\n".format(query.count()))
+    echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(query.count()))
     echo.echo(_formatted_table_list(pseudo for [pseudo] in query.iterall()))
     echo.echo("")
 

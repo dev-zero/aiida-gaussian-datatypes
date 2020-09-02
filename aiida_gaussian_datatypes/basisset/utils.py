@@ -85,7 +85,7 @@ def parse_single_cp2k_basisset(basis):
     """
     :param basis: A list of strings, where each string contains a line read from the basis set file.
                   The list must one single basis set.
-    :return:      A dictionary containing the element, tags, aliases, orbital_quantum_numbers, coefficients
+    :return:      A dictionary containing the element, name, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
     # pylint: disable=too-many-locals
