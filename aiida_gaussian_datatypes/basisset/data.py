@@ -183,7 +183,7 @@ class BasisSet(Data):
 
         for block in self.blocks:
             # for each l quantum number we get number of m quantum numbers times number of "shells" MOs
-            norbfuncs += sum((2 * l + 1) * nshells for l, nshells in block["l"])
+            norbfuncs += sum((2 * lqn + 1) * nshells for lqn, nshells in block["l"])
 
         return norbfuncs
 

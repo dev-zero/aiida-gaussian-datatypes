@@ -189,16 +189,16 @@ def dump_pseudo(sym, name, tags, output_format, data):
             raise click.UsageError("can not specify node IDs and filters at the same time")
     else:
         query = QueryBuilder()
-        query.append(Pseudopotential, project=['*'])
+        query.append(Pseudopotential, project=["*"])
 
         if sym:
-            query.add_filter(Pseudopotential, {'attributes.element': {'==': sym}})
+            query.add_filter(Pseudopotential, {"attributes.element": {"==": sym}})
 
         if name:
-            query.add_filter(Pseudopotential, {'attributes.aliases': {'contains': [name]}})
+            query.add_filter(Pseudopotential, {"attributes.aliases": {"contains": [name]}})
 
         if tags:
-            query.add_filter(Pseudopotential, {'attributes.tags': {'contains': tags}})
+            query.add_filter(Pseudopotential, {"attributes.tags": {"contains": tags}})
 
         if not query.count():
             echo.echo_warning("No Gaussian Pseudopotential found.", err=echo.is_stdout_redirected())

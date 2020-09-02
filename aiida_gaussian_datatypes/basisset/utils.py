@@ -41,7 +41,7 @@ def write_cp2k_basisset(
                 n=block["n"], lmin=block["l"][0][0], lmax=block["l"][-1][0], nexp=len(block["coefficients"])
             )
         )
-        fhandle.write(" ".join(str(l[1]) for l in block["l"]))
+        fhandle.write(" ".join(str(lqn[1]) for lqn in block["l"]))
         fhandle.write("\n")
 
         for row in block["coefficients"]:
@@ -142,7 +142,7 @@ def parse_single_cp2k_basisset(basis):
         blocks.append(
             {
                 "n": qn_n,
-                "l": [(l, nl) for l, nl in zip(range(qn_lmin, qn_lmax + 1), ncoeffs)],
+                "l": [(lqn, nl) for lqn, nl in zip(range(qn_lmin, qn_lmax + 1), ncoeffs)],
                 "coefficients": [[float(c) for c in basis[nline + n].split()] for n in range(nexp)],
             }
         )

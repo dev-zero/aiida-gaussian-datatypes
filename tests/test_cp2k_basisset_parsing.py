@@ -63,8 +63,8 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(
-            [l.strip() for l in content.splitlines()[1:]],  # do not compare the name
-            [l.lstrip() for l in output.getvalue().splitlines()[2:]],  # do not compare the comment or the name
+            [line.strip() for line in content.splitlines()[1:]],  # do not compare the name
+            [line.lstrip() for line in output.getvalue().splitlines()[2:]],  # do not compare the comment or the name
         )
 
     def test_roundtrip_multi_shell(self):
@@ -83,6 +83,6 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
 
         # ignore the first element since the family name might contain aliases we are not going to write
         self.assertEqual(
-            [l.strip() for l in content.splitlines()[1:]],  # do not compare the name
-            [l.lstrip() for l in output.getvalue().splitlines()[2:]],  # do not compare the comment or the name
+            [line.strip() for line in content.splitlines()[1:]],  # do not compare the name
+            [line.lstrip() for line in output.getvalue().splitlines()[2:]],  # do not compare the comment or the name
         )
