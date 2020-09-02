@@ -257,7 +257,8 @@ class BasisSet(Data):
                     pass
                 else:
                     raise UniquenessError(
-                        f"Gaussian Basis Set already exists for element={bset.element}, name={bset.name}: {latest.uuid}"
+                        f"Gaussian Basis Set already exists for"
+                        f" element={bset['element']}, name={bset['name']}: {latest.uuid}"
                     )
 
         elif duplicate_handling == "new":

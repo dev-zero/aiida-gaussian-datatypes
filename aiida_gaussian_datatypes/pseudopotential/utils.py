@@ -53,6 +53,7 @@ def parse_single_cp2k_pseudo(lines):
     Parse a single CP2K pseudopotential entry
 
     :param lines: List of strings where each string is a line from the original file
+    :return:      A dictionary containing the element, name, tags, aliases, n_el, local, non_local attributes
     """
 
     # pylint: disable=too-many-locals

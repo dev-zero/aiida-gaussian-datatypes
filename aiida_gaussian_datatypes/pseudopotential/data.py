@@ -279,7 +279,7 @@ class Pseudopotential(Data):
                 else:
                     raise UniquenessError(
                         f"Gaussian Pseudopotential already exists for"
-                        " element={pseudo.element}, name={pseudo.name}: {latest.uuid}"
+                        f" element={pseudo['element']}, name={pseudo['name']}: {latest.uuid}"
                     )
 
         elif duplicate_handling == "new":
