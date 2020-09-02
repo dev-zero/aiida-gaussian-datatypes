@@ -17,7 +17,7 @@
         "Intended Audience :: Science/Research",
         "Framework::AiiDA"
     ],
-    "version": "0.3.0",
+    "version": "0.3.1",
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
