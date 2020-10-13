@@ -26,6 +26,10 @@
         "aiida.cmdline.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.cli:cli",
             "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.cli:cli"
+        ],
+        "aiida.groups": [
+            "gaussian.basisset = aiida_gaussian_datatypes.groups:BasisSetGroup",
+            "gaussian.pseudo = aiida_gaussian_datatypes.groups:PseudopotentialGroup"
         ]
     },
     "scripts": [],
