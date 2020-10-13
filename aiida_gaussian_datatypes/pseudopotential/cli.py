@@ -13,8 +13,8 @@ import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
-from aiida.cmdline.params import arguments
-from aiida.cmdline.params.types import DataParamType
+from aiida.cmdline.params import arguments, options
+from aiida.cmdline.params.types import DataParamType, GroupParamType
 
 from ..utils import click_parse_range  # pylint: disable=relative-beyond-top-level
 
@@ -78,9 +78,11 @@ def cli():
     '--duplicates',
     type=click.Choice(['ignore', 'error', 'new']), default='ignore',
     help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+@options.GROUP(type=GroupParamType(create_if_not_exist=True, sub_classes=('aiida.groups:gaussian.pseudo',)),
+               help="A group of type gaussian.pseudo to add created nodes to (will be created if it doesn't exist).")
 # fmt: on
 @decorators.with_dbenv()
-def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates):
+def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, group):
     """
     Add a pseudopotential from a file to the database
     """
@@ -106,22 +108,27 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates):
         pseudo = pseudos[0]
         click.confirm("Add a Gaussian '{p.name}' Pseudopotential for '{p.element}'?".format(p=pseudo), abort=True)
         pseudo.store()
-        return
 
-    echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
-    echo.echo(_formatted_table_import(pseudos))
-    echo.echo("")
+    else:
+        echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
+        echo.echo(_formatted_table_import(pseudos))
+        echo.echo("")
 
-    indexes = click.prompt(
-        "Which Gaussian Pseudopotentials do you want to add?"
-        " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
-        value_proc=lambda v: click_parse_range(v, len(pseudos)))
+        indexes = click.prompt(
+            "Which Gaussian Pseudopotentials do you want to add?"
+            " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
+            value_proc=lambda v: click_parse_range(v, len(pseudos)))
 
-    for idx in indexes:
-        echo.echo_info(
-            "Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]), nl=False)
-        pseudos[idx].store()
-        echo.echo("DONE")
+        for idx in indexes:
+            echo.echo_info(
+                "Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]), nl=False)
+            pseudos[idx].store()
+            echo.echo("DONE")
+
+    if group:
+        echo.echo_info(f"The created Gaussian Pseudopotential nodes were added to group '{group.label}'")
+        group.store()
+        group.add_nodes(pseudos)
 
 
 @cli.command('list')

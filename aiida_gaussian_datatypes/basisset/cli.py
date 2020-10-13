@@ -13,9 +13,8 @@ import tabulate
 
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.utils import decorators, echo
-from aiida.cmdline.params import arguments
-from aiida.cmdline.params.types import DataParamType
-
+from aiida.cmdline.params import arguments, options
+from aiida.cmdline.params.types import DataParamType, GroupParamType
 from ..utils import click_parse_range
 
 
@@ -77,9 +76,11 @@ def cli():
     '--duplicates',
     type=click.Choice(['ignore', 'error', 'new']), default='ignore',
     help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+@options.GROUP(type=GroupParamType(create_if_not_exist=True, sub_classes=('aiida.groups:gaussian.basisset',)),
+               help="A group of type gaussian.basisset to add created nodes to (will be created if it doesn't exist).")
 # fmt: on
 @decorators.with_dbenv()
-def import_basisset(basisset_file, fformat, sym, tags, duplicates):
+def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
     """
     Add a basis sets from a file to the database
     """
@@ -105,21 +106,26 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates):
         bset = bsets[0]
         click.confirm("Add a Gaussian Basis Set for '{b.element}' from '{b.name}'?".format(b=bset), abort=True)
         bset.store()
-        return
 
-    echo.echo_info("{} Gaussian Basis Sets found:\n".format(len(bsets)))
-    echo.echo(_formatted_table_import(bsets))
-    echo.echo("")
+    else:
+        echo.echo_info("{} Gaussian Basis Sets found:\n".format(len(bsets)))
+        echo.echo(_formatted_table_import(bsets))
+        echo.echo("")
 
-    indexes = click.prompt(
-        "Which Gaussian Basis Set do you want to add?"
-        " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
-        value_proc=lambda v: click_parse_range(v, len(bsets)))
+        indexes = click.prompt(
+            "Which Gaussian Basis Set do you want to add?"
+            " ('n' for none, 'a' for all, comma-seperated list or range of numbers)",
+            value_proc=lambda v: click_parse_range(v, len(bsets)))
 
-    for idx in indexes:
-        echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
-        bsets[idx].store()
-        echo.echo("DONE")
+        for idx in indexes:
+            echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
+            bsets[idx].store()
+            echo.echo("DONE")
+
+    if group:
+        echo.echo_info(f"The created Gaussian Basis Set nodes were added to group '{group.label}'")
+        group.store()
+        group.add_nodes(bsets)
 
 
 @cli.command('list')
