@@ -135,7 +135,10 @@ def parse_single_cp2k_basisset(basis):
     for _ in range(n_blocks):
         # get the quantum numbers for this set, formatted as follows:
         # n lmin lmax nexp nshell(lmin) nshell(lmin+1) ... nshell(lmax-1) nshell(lmax)
-        qn_n, qn_lmin, qn_lmax, nexp, *ncoeffs = [int(qn) for qn in basis[nline].split()]
+        # ignore everything after nshell(lmax) on the same line (as CP2K does)
+        tokens = basis[nline].split()
+        qn_n, qn_lmin, qn_lmax, nexp = [int(qn) for qn in tokens[:4]]
+        ncoeffs = [int(qn) for qn in tokens[4 : 5 + qn_lmax - qn_lmin]]  # noqa: E203
 
         nline += 1
 

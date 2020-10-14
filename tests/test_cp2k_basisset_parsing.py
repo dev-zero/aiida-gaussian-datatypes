@@ -86,3 +86,11 @@ class CP2KBasisSetParsingTest(unittest.TestCase):
             [line.strip() for line in content.splitlines()[1:]],  # do not compare the name
             [line.lstrip() for line in output.getvalue().splitlines()[2:]],  # do not compare the comment or the name
         )
+
+    def test_ignore_data_after_nshell(self):
+        """CP2K ignores all data after the nshell(lmax) integer, make sure we do too"""
+
+        with open(TEST_DIR.joinpath("BASIS_MOLOPT.U"), "r") as fhandle:
+            content = fhandle.read()
+
+        parse_single_cp2k_basisset(content.splitlines())
