@@ -6,7 +6,7 @@
 Gaussian Pseudopotential Data class
 """
 
-from aiida.orm import Data
+from aiida.orm import Data, Group
 
 from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
@@ -199,7 +199,7 @@ class Pseudopotential(Data):
         return self.get_attribute("non_local", [])
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
         """
         Get the first matching Pseudopotential for the given parameters.
 
@@ -211,18 +211,27 @@ class Pseudopotential(Data):
         from aiida.orm.querybuilder import QueryBuilder
         from aiida.common.exceptions import NotExistent
 
+        query = QueryBuilder()
+
+        params = {}
+
+        if group_label:
+            query.append(Group, filters={"label": group_label}, tag="group")
+            params["with_group"] = "group"
+
+        query.append(Pseudopotential, **params)
+
         filters = {"attributes.element": {"==": element}}
 
         if version != "latest":
             filters["attributes.version"] = {"==": version}
 
-        if match_aliases:
-            filters["attributes.aliases"] = {"contains": [name]}
-        else:
-            filters["attributes.name"] = {"==": name}
+        if name:
+            if match_aliases:
+                filters["attributes.aliases"] = {"contains": [name]}
+            else:
+                filters["attributes.name"] = {"==": name}
 
-        query = QueryBuilder()
-        query.append(Pseudopotential)
         query.add_filter(Pseudopotential, filters)
 
         # SQLA ORM only solution:
