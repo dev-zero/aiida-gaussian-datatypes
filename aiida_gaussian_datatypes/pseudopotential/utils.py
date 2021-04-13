@@ -21,11 +21,12 @@ EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
 BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")
 
 
-def cp2k_pseudo_file_iter(fhandle):
+def cp2k_pseudo_file_iter(fhandle, ignore_invalid=False):
     """
     Generates a sequence of dicts, one dict for each pseudopotential found in the given file
 
     :param fhandle: Open file handle (in text mode) to a pseudopotential file
+    :param ignore_invalid: Whether to ignore invalid entries completely
     """
 
     # find the beginning of a new pseudopotential entry, then
@@ -49,7 +50,10 @@ def cp2k_pseudo_file_iter(fhandle):
             except UnsupportedExtensionError:
                 current_pseudo = []  # do not yield this pseudo, reset the line state tracker
             except Exception as exc:
-                raise ParsingError("failed to parse block for '{}': {}".format(current_pseudo[0], exc)) from exc
+                if ignore_invalid:
+                    current_pseudo = []
+                else:
+                    raise ParsingError("failed to parse block for '{}': {}".format(current_pseudo[0], exc)) from exc
 
         current_pseudo.append(line.strip())
 

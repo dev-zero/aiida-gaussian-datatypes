@@ -248,13 +248,14 @@ class Pseudopotential(Data):
         return existing[0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
+    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in CP2K format
 
         :param fhandle: open file handle
         :param filters: a dict with attribute filter functions
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
         :rtype: list
         """
 
@@ -274,7 +275,7 @@ class Pseudopotential(Data):
 
             return True
 
-        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle) if matches_criteria(p)]
+        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle, ignore_invalid) if matches_criteria(p)]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             pseudos = [p for p in pseudos if not exists(p)]
