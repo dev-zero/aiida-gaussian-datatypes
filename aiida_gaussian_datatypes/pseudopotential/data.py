@@ -30,7 +30,13 @@ class Pseudopotential(Data):
         **kwargs,
     ):
         """
-        TODO
+        :param element: string containing the name of the element
+        :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
+        :param aliases: alternative names
+        :param tags: additional tags
+        :param n_el: number of valence electrons covered by this basis set
+        :param local: see :py:attr:`~local`
+        :param local: see :py:attr:`~non_local`
         """
 
         if not aliases:
@@ -44,6 +50,9 @@ class Pseudopotential(Data):
 
         if not non_local:
             non_local = []
+
+        if "label" not in kwargs:
+            kwargs["label"] = name
 
         super(Pseudopotential, self).__init__(**kwargs)
 

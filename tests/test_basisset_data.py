@@ -13,6 +13,9 @@ def test_import_from_cp2k():
 
     bsets[0].store()
 
+    # check that the name is used for the node label
+    assert bsets[0].label == bsets[0].name
+
 
 def test_lookup():
     BasisSet = DataFactory("gaussian.basisset")

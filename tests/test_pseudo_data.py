@@ -16,6 +16,9 @@ def test_import_from_cp2k():
 
     pseudos[0].store()
 
+    # check that the name is used for the node label
+    assert pseudos[0].label == pseudos[0].name
+
 
 def test_ignore_import_unsupported_from_cp2k():
     """Some potential format are not yet supported, check that we do not choke on them"""

@@ -35,6 +35,9 @@ class BasisSet(Data):
         if not blocks:
             blocks = []
 
+        if "label" not in kwargs:
+            kwargs["label"] = name
+
         super(BasisSet, self).__init__(**kwargs)
 
         self.set_attribute("name", name)
