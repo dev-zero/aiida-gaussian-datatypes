@@ -7,13 +7,12 @@ Gaussian Basis Set helper functions
 """
 
 import re
-
 from ..utils import SYM2NUM
 
 
 EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
 BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")
-N_VAL_EL_MATCH = re.compile(r"^q(\d+)$")
+N_VAL_EL_MATCH = re.compile(r"q(\d+)$")
 
 
 def write_cp2k_basisset(
@@ -81,10 +80,19 @@ def cp2k_basisset_file_iter(fhandle):
         yield parse_single_cp2k_basisset(current_basis)
 
 
+def unique(sequence):
+    """Return a unique sequence based on the given with order preserved"""
+    seen = set()
+    for element in sequence:
+        if element not in seen:
+            seen.add(element)
+            yield element
+
+
 def parse_single_cp2k_basisset(basis):
     """
     :param basis: A list of strings, where each string contains a line read from the basis set file.
-                  The list must one single basis set.
+                  The list must contain one single basis set.
     :return:      A dictionary containing the element, name, tags, aliases, orbital_quantum_numbers, coefficients
     """
 
@@ -94,13 +102,18 @@ def parse_single_cp2k_basisset(basis):
     identifiers = basis[0].split()
     element = identifiers.pop(0)
 
-    # put the longest identifier first: some basis sets specify the number of
-    # valence electrons using <IDENTIFIER>-qN
-    identifiers.sort(key=lambda i: -len(i))
+    # Use the most specific name (currently the one with the number of valence electroncs -qN)
+    # first. If both have a -qN suffix, take the first one as the name, if none have a -qN suffix, take the longest
+    for name in identifiers:
+        if N_VAL_EL_MATCH.search(name):
+            # move to beginning of identifiers list
+            identifiers.remove(name)
+            identifiers.insert(0, name)
+            break
+    else:
+        identifiers.sort(key=lambda i: -len(i))
 
-    name = identifiers.pop(0)
-    tags = name.split("-")
-    aliases = [name] + identifiers  # use the remaining identifiers as aliases
+    tags = list(unique(t for name in identifiers for t in name.split("-")))
 
     n_el = None
 
@@ -135,7 +148,10 @@ def parse_single_cp2k_basisset(basis):
     for _ in range(n_blocks):
         # get the quantum numbers for this set, formatted as follows:
         # n lmin lmax nexp nshell(lmin) nshell(lmin+1) ... nshell(lmax-1) nshell(lmax)
-        qn_n, qn_lmin, qn_lmax, nexp, *ncoeffs = [int(qn) for qn in basis[nline].split()]
+        # ignore everything after nshell(lmax) on the same line (as CP2K does)
+        tokens = basis[nline].split()
+        qn_n, qn_lmin, qn_lmax, nexp = [int(qn) for qn in tokens[:4]]
+        ncoeffs = [int(qn) for qn in tokens[4 : 5 + qn_lmax - qn_lmin]]  # noqa: E203
 
         nline += 1
 
@@ -150,4 +166,11 @@ def parse_single_cp2k_basisset(basis):
         # advance by the number of exponents
         nline += nexp
 
-    return {"element": element, "name": name, "tags": tags, "aliases": aliases, "n_el": n_el, "blocks": blocks}
+    return {
+        "element": element,
+        "name": identifiers[0],
+        "tags": tags,
+        "aliases": identifiers,
+        "n_el": n_el,
+        "blocks": blocks,
+    }

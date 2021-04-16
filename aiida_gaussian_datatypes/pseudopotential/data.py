@@ -6,7 +6,7 @@
 Gaussian Pseudopotential Data class
 """
 
-from aiida.orm import Data
+from aiida.orm import Data, Group
 
 from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
@@ -30,7 +30,13 @@ class Pseudopotential(Data):
         **kwargs,
     ):
         """
-        TODO
+        :param element: string containing the name of the element
+        :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
+        :param aliases: alternative names
+        :param tags: additional tags
+        :param n_el: number of valence electrons covered by this basis set
+        :param local: see :py:attr:`~local`
+        :param local: see :py:attr:`~non_local`
         """
 
         if not aliases:
@@ -44,6 +50,9 @@ class Pseudopotential(Data):
 
         if not non_local:
             non_local = []
+
+        if "label" not in kwargs:
+            kwargs["label"] = name
 
         super(Pseudopotential, self).__init__(**kwargs)
 
@@ -199,7 +208,7 @@ class Pseudopotential(Data):
         return self.get_attribute("non_local", [])
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
         """
         Get the first matching Pseudopotential for the given parameters.
 
@@ -209,43 +218,59 @@ class Pseudopotential(Data):
         :param match_aliases: Whether to look in the list of of aliases for a matching name
         """
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent
+        from aiida.common.exceptions import NotExistent, MultipleObjectsError
+
+        query = QueryBuilder()
+
+        params = {}
+
+        if group_label:
+            query.append(Group, filters={"label": group_label}, tag="group")
+            params["with_group"] = "group"
+
+        query.append(Pseudopotential, **params)
 
         filters = {"attributes.element": {"==": element}}
 
         if version != "latest":
             filters["attributes.version"] = {"==": version}
 
-        if match_aliases:
-            filters["attributes.aliases"] = {"contains": [name]}
-        else:
-            filters["attributes.name"] = {"==": name}
+        if name:
+            if match_aliases:
+                filters["attributes.aliases"] = {"contains": [name]}
+            else:
+                filters["attributes.name"] = {"==": name}
 
-        query = QueryBuilder()
-        query.append(Pseudopotential)
         query.add_filter(Pseudopotential, filters)
 
         # SQLA ORM only solution:
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
-        # existing = query.first()
+        # items = query.first()
 
-        existing = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)[0] if query.count() else []
+        items = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)
 
-        if not existing:
+        if not items:
             raise NotExistent(
                 f"No Gaussian Pseudopotential found for element={element}, name={name}, version={version}"
             )
 
-        return existing[0]
+        # if we get different names there is no well ordering, sorting by version only works if they have the same name
+        if len(set(p[0].name for p in items)) > 1:
+            raise MultipleObjectsError(
+                f"Multiple Gaussian Pseudopotentials found for element={element}, name={name}, version={version}"
+            )
+
+        return items[0][0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
+    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in CP2K format
 
         :param fhandle: open file handle
         :param filters: a dict with attribute filter functions
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
         :rtype: list
         """
 
@@ -265,7 +290,7 @@ class Pseudopotential(Data):
 
             return True
 
-        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle) if matches_criteria(p)]
+        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle, ignore_invalid) if matches_criteria(p)]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             pseudos = [p for p in pseudos if not exists(p)]

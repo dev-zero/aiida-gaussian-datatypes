@@ -13,15 +13,20 @@ from itertools import chain
 from aiida.common.exceptions import ParsingError
 
 
+class UnsupportedExtensionError(ParsingError):
+    pass
+
+
 EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
 BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")
 
 
-def cp2k_pseudo_file_iter(fhandle):
+def cp2k_pseudo_file_iter(fhandle, ignore_invalid=False):
     """
     Generates a sequence of dicts, one dict for each pseudopotential found in the given file
 
     :param fhandle: Open file handle (in text mode) to a pseudopotential file
+    :param ignore_invalid: Whether to ignore invalid entries completely
     """
 
     # find the beginning of a new pseudopotential entry, then
@@ -40,10 +45,15 @@ def cp2k_pseudo_file_iter(fhandle):
         if match and current_pseudo:
             try:
                 pseudo_data = parse_single_cp2k_pseudo(current_pseudo)
+                yield pseudo_data
+                current_pseudo = []
+            except UnsupportedExtensionError:
+                current_pseudo = []  # do not yield this pseudo, reset the line state tracker
             except Exception as exc:
-                raise ParsingError("failed to parse block for '{}': {}".format(current_pseudo[0], exc)) from exc
-            yield pseudo_data
-            current_pseudo = []
+                if ignore_invalid:
+                    current_pseudo = []
+                else:
+                    raise ParsingError("failed to parse block for '{}': {}".format(current_pseudo[0], exc)) from exc
 
         current_pseudo.append(line.strip())
 
@@ -82,38 +92,43 @@ def parse_single_cp2k_pseudo(lines):
     if int(nexp_ppl_s) != len(local["coeffs"]):
         raise ParsingError("less coefficients found than expected while parsing the block")
 
-    nprj = int(lines[3])
     prj_ppnl = []
-    nline = 4  # start processing the non-local function blocks (if any) at this line
-    while len(prj_ppnl) < nprj:
-        try:
-            r_nprj_s, nprj_ppnl_s, *hprj_ppnl = lines[nline].split()
-        except IndexError:
-            raise ParsingError("premature end-of-lines while reading a block of non-local projectors")
 
-        nline += 1
+    if len(lines) > 3:
+        if lines[3].startswith("NLCC"):
+            raise UnsupportedExtensionError("the NLCC extension is not yet supported")
 
-        nprj_ppnl = int(nprj_ppnl_s)
-        ncoeffs = nprj_ppnl * (nprj_ppnl + 1) // 2  # number of elements in the upper triangular matrix
-
-        # the matrix may be distributed over multiple lines, add those values as well
-        while len(hprj_ppnl) < ncoeffs:
+        nprj = int(lines[3])
+        nline = 4  # start processing the non-local function blocks (if any) at this line
+        while len(prj_ppnl) < nprj:
             try:
-                hprj_ppnl += lines[nline].split()
+                r_nprj_s, nprj_ppnl_s, *hprj_ppnl = lines[nline].split()
             except IndexError:
-                raise ParsingError("premature end-of-lines while reading coefficients of non-local projects")
+                raise ParsingError("premature end-of-lines while reading a block of non-local projectors")
+
             nline += 1
 
-        if len(hprj_ppnl) > ncoeffs:
-            raise ParsingError("unknown format of the non-local projector coefficients")
+            nprj_ppnl = int(nprj_ppnl_s)
+            ncoeffs = nprj_ppnl * (nprj_ppnl + 1) // 2  # number of elements in the upper triangular matrix
 
-        prj_ppnl.append(
-            {
-                "r": float(r_nprj_s),
-                "nproj": nprj_ppnl,  # store for convenience
-                "coeffs": [float(f) for f in hprj_ppnl],  # upper triangular matrix
-            }
-        )
+            # the matrix may be distributed over multiple lines, add those values as well
+            while len(hprj_ppnl) < ncoeffs:
+                try:
+                    hprj_ppnl += lines[nline].split()
+                except IndexError:
+                    raise ParsingError("premature end-of-lines while reading coefficients of non-local projects")
+                nline += 1
+
+            if len(hprj_ppnl) > ncoeffs:
+                raise ParsingError("unknown format of the non-local projector coefficients")
+
+            prj_ppnl.append(
+                {
+                    "r": float(r_nprj_s),
+                    "nproj": nprj_ppnl,  # store for convenience
+                    "coeffs": [float(f) for f in hprj_ppnl],  # upper triangular matrix
+                }
+            )
 
     return {
         "element": element,

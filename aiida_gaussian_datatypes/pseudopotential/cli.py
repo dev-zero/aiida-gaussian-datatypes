@@ -78,11 +78,15 @@ def cli():
     '--duplicates',
     type=click.Choice(['ignore', 'error', 'new']), default='ignore',
     help="Whether duplicates should be ignored, produce an error or uploaded as new version")
+@click.option(
+    '--ignore-invalid/--no-ignore-invalid',
+    default=False,
+    help="Whether to ignore invalid entries when parsing")
 @options.GROUP(type=GroupParamType(create_if_not_exist=True, sub_classes=('aiida.groups:gaussian.pseudo',)),
                help="A group of type gaussian.pseudo to add created nodes to (will be created if it doesn't exist).")
 # fmt: on
 @decorators.with_dbenv()
-def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, group):
+def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_invalid, group):
     """
     Add a pseudopotential from a file to the database
     """
@@ -98,7 +102,7 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, group):
         'tags': lambda x: not tags or set(tags).issubset(x),
     }
 
-    pseudos = loaders[fformat](pseudopotential_file, filters, duplicates)
+    pseudos = loaders[fformat](pseudopotential_file, filters, duplicates, ignore_invalid)
 
     if not pseudos:
         echo.echo_info("No valid Gaussian Pseudopotentials found in the given file matching the given criteria")

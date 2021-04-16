@@ -6,38 +6,39 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.6, 3.7, 3.8]
+        python-version: [3.7, 3.8, 3.9]
 
     steps:
     - uses: actions/checkout@v2
-    - uses: actions/setup-python@v1
+    - uses: actions/setup-python@v2
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
-
-    - name: Cache python dependencies
-      id: cache-pip
-      uses: actions/cache@v1
-      with:
-        path: ~/.cache/pip
-        key: pip-${{ matrix.python-version }}-tests-${{ hashFiles('**/setup.json') }}
-        restore-keys: |
-          pip-${{ matrix.python-version }}-tests
 
     - name: Install system dependencies
       run: |
         wget -O - "https://github.com/rabbitmq/signing-keys/releases/download/2.0/rabbitmq-release-signing-key.asc" | sudo apt-key add -
         echo 'deb https://dl.bintray.com/rabbitmq-erlang/debian bionic erlang' | sudo tee -a /etc/apt/sources.list.d/bintray.rabbitmq.list
         echo 'deb https://dl.bintray.com/rabbitmq/debian bionic main' | sudo tee -a /etc/apt/sources.list.d/bintray.rabbitmq.list
+        sudo rm -f /etc/apt/sources.list.d/dotnetdev.list /etc/apt/sources.list.d/microsoft-prod.list
         sudo apt update
-        sudo apt install postgresql postgresql-server-dev-all postgresql-client
-        sudo apt install rabbitmq-server
+        sudo apt install postgresql-12 rabbitmq-server graphviz
         sudo systemctl status rabbitmq-server.service
+
+    - name: Cache python dependencies
+      id: cache-pip
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: pip-${{ matrix.python-version }}-tests-${{ hashFiles('**/setup.json') }}
+        restore-keys: |
+          pip-${{ matrix.python-version }}-tests
 
     - name: Install python dependencies
       run: |
+        pip install --upgrade pip
         pip install -e .[testing]
-        reentry scan
+        reentry scan -r aiida
 
     - name: Run pytest
       run: pytest --cov-report xml --cov-report term-missing --cov-append --cov aiida_gaussian_datatypes tests/

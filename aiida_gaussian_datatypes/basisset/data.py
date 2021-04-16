@@ -6,7 +6,7 @@
 Gaussian Basis Set Data Class
 """
 
-from aiida.orm import Data
+from aiida.orm import Data, Group
 
 from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
 
@@ -34,6 +34,9 @@ class BasisSet(Data):
 
         if not blocks:
             blocks = []
+
+        if "label" not in kwargs:
+            kwargs["label"] = name
 
         super(BasisSet, self).__init__(**kwargs)
 
@@ -188,34 +191,49 @@ class BasisSet(Data):
         return norbfuncs
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent
+        from aiida.common.exceptions import NotExistent, MultipleObjectsError
+
+        query = QueryBuilder()
+
+        params = {}
+
+        if group_label:
+            query.append(Group, filters={"label": group_label}, tag="group")
+            params["with_group"] = "group"
+
+        query.append(BasisSet, **params)
 
         filters = {"attributes.element": {"==": element}}
 
         if version != "latest":
             filters["attributes.version"] = {"==": version}
 
-        if match_aliases:
-            filters["attributes.aliases"] = {"contains": [name]}
-        else:
-            filters["attributes.name"] = {"==": name}
+        if name:
+            if match_aliases:
+                filters["attributes.aliases"] = {"contains": [name]}
+            else:
+                filters["attributes.name"] = {"==": name}
 
-        query = QueryBuilder()
-        query.append(BasisSet)
         query.add_filter(BasisSet, filters)
 
         # SQLA ORM only solution:
         # query.order_by({BasisSet: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
-        # existing = query.first()
+        # items = query.first()
 
-        existing = sorted(query.iterall(), key=lambda b: b[0].version, reverse=True)[0] if query.count() else []
+        items = sorted(query.iterall(), key=lambda b: b[0].version, reverse=True)
 
-        if not existing:
+        if not items:
             raise NotExistent(f"No Gaussian Basis Set found for element={element}, name={name}, version={version}")
 
-        return existing[0]
+        # if we get different names there is no well ordering, sorting by version only works if they have the same name
+        if len(set(b[0].name for b in items)) > 1:
+            raise MultipleObjectsError(
+                f"Multiple Gaussian Basis Set found for element={element}, name={name}, version={version}"
+            )
+
+        return items[0][0]
 
     @classmethod
     def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
