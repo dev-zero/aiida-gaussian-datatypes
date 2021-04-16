@@ -9,6 +9,7 @@
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.9",
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
@@ -36,7 +37,7 @@
     "reentry_register": true,
     "install_requires": [
         "voluptuous >= 0.11.7",
-        "aiida-core >= 1.1.0"
+        "aiida-core >= 1.6.0"
     ],
     "extras_require": {
         "testing": [
