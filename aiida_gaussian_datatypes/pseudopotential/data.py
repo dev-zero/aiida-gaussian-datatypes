@@ -218,7 +218,7 @@ class Pseudopotential(Data):
         :param match_aliases: Whether to look in the list of of aliases for a matching name
         """
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent
+        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -245,16 +245,22 @@ class Pseudopotential(Data):
 
         # SQLA ORM only solution:
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
-        # existing = query.first()
+        # items = query.first()
 
-        existing = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)[0] if query.count() else []
+        items = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)
 
-        if not existing:
+        if not items:
             raise NotExistent(
                 f"No Gaussian Pseudopotential found for element={element}, name={name}, version={version}"
             )
 
-        return existing[0]
+        # if we get different names there is no well ordering, sorting by version only works if they have the same name
+        if len(set(p[0].name for p in items)) > 1:
+            raise MultipleObjectsError(
+                f"Multiple Gaussian Pseudopotentials found for element={element}, name={name}, version={version}"
+            )
+
+        return items[0][0]
 
     @classmethod
     def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):

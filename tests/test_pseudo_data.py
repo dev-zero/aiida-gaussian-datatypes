@@ -1,3 +1,4 @@
+import pytest
 from aiida.plugins import DataFactory
 
 from . import TEST_DIR
@@ -43,3 +44,26 @@ def test_lookup():
 
     assert Pseudopotential.get(element="He", name="GTH-PBE-q2")
     assert Pseudopotential.get(element="He", name="GTH-PBE")
+
+
+def test_get():
+    from aiida.common.exceptions import NotExistent, MultipleObjectsError
+
+    Pseudo = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GTH_POTENTIALS.LiH"), "r") as fhandle:
+        pseudos = Pseudo.from_cp2k(fhandle)
+
+    for pseudo in pseudos:
+        pseudo.store()
+
+    # getting a single one should work
+    pseudo = Pseudo.get(element="H", name="GTH-PBE-q1")
+    assert pseudo.element == "H" and pseudo.name == "GTH-PBE-q1"
+
+    with pytest.raises(NotExistent):
+        Pseudo.get(element="C")
+
+    # leaving away the name should return multiple ones, raising an error
+    with pytest.raises(MultipleObjectsError):
+        Pseudo.get(element="Li")

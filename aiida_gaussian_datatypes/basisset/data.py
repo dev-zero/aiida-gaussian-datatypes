@@ -193,7 +193,7 @@ class BasisSet(Data):
     @classmethod
     def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent
+        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -220,14 +220,20 @@ class BasisSet(Data):
 
         # SQLA ORM only solution:
         # query.order_by({BasisSet: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
-        # existing = query.first()
+        # items = query.first()
 
-        existing = sorted(query.iterall(), key=lambda b: b[0].version, reverse=True)[0] if query.count() else []
+        items = sorted(query.iterall(), key=lambda b: b[0].version, reverse=True)
 
-        if not existing:
+        if not items:
             raise NotExistent(f"No Gaussian Basis Set found for element={element}, name={name}, version={version}")
 
-        return existing[0]
+        # if we get different names there is no well ordering, sorting by version only works if they have the same name
+        if len(set(b[0].name for b in items)) > 1:
+            raise MultipleObjectsError(
+                f"Multiple Gaussian Basis Set found for element={element}, name={name}, version={version}"
+            )
+
+        return items[0][0]
 
     @classmethod
     def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
