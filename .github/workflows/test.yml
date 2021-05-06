@@ -35,14 +35,19 @@ jobs:
         python-version: ${{ matrix.python-version }}
         architecture: x64
 
+    - name: Get pip cache dir
+      id: pip-cache
+      run: |
+        echo "::set-output name=dir::$(pip cache dir)"
+
     - name: Cache python dependencies
       id: cache-pip
       uses: actions/cache@v2
       with:
-        path: ~/.cache/pip
-        key: pip-${{ matrix.python-version }}-tests-${{ hashFiles('**/setup.json') }}
+        path: ${{ steps.pip-cache.outputs.dir }}
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/setup.json') }}
         restore-keys: |
-          pip-${{ matrix.python-version }}-tests
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
 
     - name: Install python dependencies
       run: |
