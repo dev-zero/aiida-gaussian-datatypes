@@ -88,32 +88,44 @@ class Pseudopotential(Data):
     def _validate(self):
         super(Pseudopotential, self)._validate()
 
-        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA
+        from pydantic import BaseModel, ValidationError as PydanticValidationError
+        from typing import List, Optional
         from aiida.common.exceptions import ValidationError
 
-        # fmt: off
-        schema = Schema({
-            'name': str,
-            'element': str,
-            'tags': [str],
-            'aliases': [str],
-            'n_el': [int],
-            'local': {
-                'r': float,
-                'coeffs': [float],
-                },
-            'non_local': [{
-                'r': float,
-                'nproj': int,
-                'coeffs': [float],
-                }],
-            'version': int,
-            }, extra=ALLOW_EXTRA, required=True)
-        # fmt: on
+        class PseudoDataLocal(BaseModel):
+            r: float
+            coeffs: List[float]
+
+            class Config:
+                validate_all = True
+                extra = "forbid"
+
+        class PseudoDataNonLocal(BaseModel):
+            r: float
+            nproj: int
+            coeffs: List[float]
+
+            class Config:
+                validate_all = True
+                extra = "forbid"
+
+        class PseudoData(BaseModel):
+            name: str
+            element: str
+            tags: List[str]
+            aliases: List[str]
+            n_el: Optional[List[int]] = None
+            local: PseudoDataLocal
+            non_local: List[PseudoDataNonLocal]
+            version: int
+
+            class Config:
+                validate_all = True
+                extra = "forbid"
 
         try:
-            schema(self.attributes)
-        except MultipleInvalid as exc:
+            PseudoData.parse_obj(self.attributes)
+        except PydanticValidationError as exc:
             raise ValidationError(str(exc))
 
         for nlocal in self.attributes["non_local"]:

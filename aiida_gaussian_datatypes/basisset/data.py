@@ -71,28 +71,35 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Any, Length
+        from pydantic import BaseModel, ValidationError as PydanticValidationError
+        from typing import List, Optional, Tuple
         from aiida.common.exceptions import ValidationError
 
-        # fmt: off
-        schema = Schema({
-            'name': str,
-            'element': str,
-            'tags': [str],
-            'aliases': [str],
-            'n_el': Any(int, None),
-            'blocks': [{
-                "n": int,
-                "l": [All([int], Length(2, 2)), All((int,), Length(2, 2))],
-                "coefficients": [[float]],
-                }],
-            'version': int,
-            }, extra=ALLOW_EXTRA, required=True)
-        # fmt: on
+        class BasisSetCoefficients(BaseModel):
+            n: int
+            l: List[Tuple[int, int]]
+            coefficients: List[List[float]]
+
+            class Config:
+                validate_all = True
+                extra = "forbid"
+
+        class BasisSetData(BaseModel):
+            name: str
+            element: str
+            tags: List[str]
+            aliases: List[str]
+            n_el: Optional[int] = None
+            blocks: List[BasisSetCoefficients]
+            version: int
+
+            class Config:
+                validate_all = True
+                extra = "forbid"
 
         try:
-            schema(self.attributes)
-        except MultipleInvalid as exc:
+            BasisSetData.parse_obj(self.attributes)
+        except PydanticValidationError as exc:
             raise ValidationError(str(exc))
 
     @property

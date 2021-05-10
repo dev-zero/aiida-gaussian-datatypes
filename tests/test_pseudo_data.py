@@ -1,5 +1,6 @@
 import pytest
 from aiida.plugins import DataFactory
+from aiida.common.exceptions import ValidationError
 
 from . import TEST_DIR
 
@@ -67,3 +68,19 @@ def test_get():
     # leaving away the name should return multiple ones, raising an error
     with pytest.raises(MultipleObjectsError):
         Pseudo.get(element="Li")
+
+
+def test_validation_empty():
+    Pseudo = DataFactory("gaussian.pseudo")
+    pseudo = Pseudo()
+
+    with pytest.raises(ValidationError):
+        pseudo.store()
+
+
+def test_validation_invalid_local():
+    Pseudo = DataFactory("gaussian.pseudo")
+    pseudo = Pseudo(name="test", element="H", local={"r": 1.23, "coeffs": [], "something": "else"})
+
+    with pytest.raises(ValidationError):
+        pseudo.store()

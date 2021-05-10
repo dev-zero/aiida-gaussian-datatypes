@@ -1,5 +1,6 @@
 import pytest
 from aiida.plugins import DataFactory
+from aiida.common.exceptions import ValidationError
 
 from . import TEST_DIR
 
@@ -60,3 +61,19 @@ def test_get():
     # leaving away the name should return multiple ones, raising an error
     with pytest.raises(MultipleObjectsError):
         BasisSet.get(element="H")
+
+
+def test_validation_empty():
+    BasisSet = DataFactory("gaussian.basisset")
+    bset = BasisSet()
+
+    with pytest.raises(ValidationError):
+        bset.store()
+
+
+def test_validation_no_l_tuple():
+    BasisSet = DataFactory("gaussian.basisset")
+    bset = BasisSet(name="test", element="H", blocks=[{"n": 1, "l": [(1, 2, 3)]}])
+
+    with pytest.raises(ValidationError):
+        bset.store()
