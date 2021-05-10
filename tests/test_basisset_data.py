@@ -1,6 +1,6 @@
 import pytest
 from aiida.plugins import DataFactory
-from aiida.common.exceptions import ValidationError
+from aiida.common.exceptions import ValidationError, NotExistent
 
 from . import TEST_DIR
 
@@ -77,3 +77,13 @@ def test_validation_no_l_tuple():
 
     with pytest.raises(ValidationError):
         bset.store()
+
+
+def test_get_matching_empty():
+    BasisSet = DataFactory("gaussian.basisset")
+
+    with open(TEST_DIR.joinpath("BASIS_MOLOPT.H"), "r") as fhandle:
+        bsets = BasisSet.from_cp2k(fhandle)
+
+    with pytest.raises(NotExistent):
+        bsets[0].get_matching_pseudopotential()

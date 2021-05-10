@@ -1,6 +1,6 @@
 import pytest
 from aiida.plugins import DataFactory
-from aiida.common.exceptions import ValidationError
+from aiida.common.exceptions import ValidationError, NotExistent
 
 from . import TEST_DIR
 
@@ -84,3 +84,13 @@ def test_validation_invalid_local():
 
     with pytest.raises(ValidationError):
         pseudo.store()
+
+
+def test_get_matching_empty():
+    Pseudo = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GTH_POTENTIALS.LiH"), "r") as fhandle:
+        pseudos = Pseudo.from_cp2k(fhandle)
+
+    with pytest.raises(NotExistent):
+        pseudos[0].get_matching_basisset()

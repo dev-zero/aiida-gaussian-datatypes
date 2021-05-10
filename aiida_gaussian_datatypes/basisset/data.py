@@ -7,6 +7,7 @@ Gaussian Basis Set Data Class
 """
 
 from aiida.orm import Data, Group
+from aiida.common.exceptions import UniquenessError, NotExistent, ValidationError, MultipleObjectsError
 
 from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
 
@@ -54,8 +55,6 @@ class BasisSet(Data):
         """
         # TODO: this uniqueness check is not race-condition free.
 
-        from aiida.common.exceptions import UniquenessError, NotExistent
-
         try:
             existing = self.get(self.element, self.name, self.version, match_aliases=False)
         except NotExistent:
@@ -73,7 +72,6 @@ class BasisSet(Data):
 
         from pydantic import BaseModel, ValidationError as PydanticValidationError
         from typing import List, Optional, Tuple
-        from aiida.common.exceptions import ValidationError
 
         class BasisSetCoefficients(BaseModel):
             n: int
@@ -198,9 +196,8 @@ class BasisSet(Data):
         return norbfuncs
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -222,6 +219,9 @@ class BasisSet(Data):
                 filters["attributes.aliases"] = {"contains": [name]}
             else:
                 filters["attributes.name"] = {"==": name}
+
+        if n_el:
+            filters["attributes.n_el"] = {"==": n_el}
 
         query.add_filter(BasisSet, filters)
 
@@ -252,8 +252,6 @@ class BasisSet(Data):
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
         :rtype: list
         """
-
-        from aiida.common.exceptions import UniquenessError, NotExistent
 
         if not filters:
             filters = {}
@@ -310,3 +308,15 @@ class BasisSet(Data):
         return write_cp2k_basisset(
             fhandle, self.element, self.name, self.blocks, comment=f"from AiiDA BasisSet<uuid: {self.uuid}>"
         )
+
+    def get_matching_pseudopotential(self, *args, **kwargs):
+        """
+        Get a pseudopotential matching this basis set by at least element and number of valence electrons.
+        Additional arguments are passed on to Pseudopotential.get()
+        """
+        from ..pseudopotential.data import Pseudopotential
+
+        if self.n_el:
+            return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
+        else:
+            return Pseudopotential.get(element=self.element, *args, **kwargs)

@@ -7,6 +7,8 @@ Gaussian Pseudopotential Data class
 """
 
 from aiida.orm import Data, Group
+from aiida.common.exceptions import UniquenessError, ValidationError, NotExistent, MultipleObjectsError
+
 
 from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
 
@@ -71,8 +73,6 @@ class Pseudopotential(Data):
         """
         # TODO: this uniqueness check is not race-condition free.
 
-        from aiida.common.exceptions import UniquenessError, NotExistent
-
         try:
             existing = self.get(self.element, self.name, self.version, match_aliases=False)
         except NotExistent:
@@ -89,8 +89,7 @@ class Pseudopotential(Data):
         super(Pseudopotential, self)._validate()
 
         from pydantic import BaseModel, ValidationError as PydanticValidationError
-        from typing import List, Optional
-        from aiida.common.exceptions import ValidationError
+        from typing import List
 
         class PseudoDataLocal(BaseModel):
             r: float
@@ -114,7 +113,7 @@ class Pseudopotential(Data):
             element: str
             tags: List[str]
             aliases: List[str]
-            n_el: Optional[List[int]] = None
+            n_el: List[int]
             local: PseudoDataLocal
             non_local: List[PseudoDataNonLocal]
             version: int
@@ -220,7 +219,7 @@ class Pseudopotential(Data):
         return self.get_attribute("non_local", [])
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
         """
         Get the first matching Pseudopotential for the given parameters.
 
@@ -230,7 +229,6 @@ class Pseudopotential(Data):
         :param match_aliases: Whether to look in the list of of aliases for a matching name
         """
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -259,7 +257,12 @@ class Pseudopotential(Data):
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
         # items = query.first()
 
-        items = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)
+        all_iter = query.iterall()
+
+        if n_el:
+            all_iter = filter(lambda p: sum(p[0].n_el) == n_el, all_iter)
+
+        items = sorted(all_iter, key=lambda p: p[0].version, reverse=True)
 
         if not items:
             raise NotExistent(
@@ -285,8 +288,6 @@ class Pseudopotential(Data):
         :param ignore_invalid: whether to ignore invalid entries silently
         :rtype: list
         """
-
-        from aiida.common.exceptions import UniquenessError, NotExistent
 
         if not filters:
             filters = {}
@@ -348,3 +349,15 @@ class Pseudopotential(Data):
             self.non_local,
             comment=f"from AiiDA Pseudopotential<uuid: {self.uuid}>",
         )
+
+    def get_matching_basisset(self, *args, **kwargs):
+        """
+        Get a pseudopotential matching this basis set by at least element and number of valence electrons.
+        Additional arguments are passed on to BasisSet.get()
+        """
+        from ..basisset.data import BasisSet
+
+        if self.n_el:
+            return BasisSet.get(element=self.element, n_el=sum(self.n_el), *args, **kwargs)
+        else:
+            return BasisSet.get(element=self.element, *args, **kwargs)
