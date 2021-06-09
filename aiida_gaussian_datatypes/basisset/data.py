@@ -6,10 +6,15 @@
 Gaussian Basis Set Data Class
 """
 
+from aiida.common.exceptions import (
+    MultipleObjectsError,
+    NotExistent,
+    UniquenessError,
+    ValidationError,
+)
 from aiida.orm import Data, Group
-from aiida.common.exceptions import UniquenessError, NotExistent, ValidationError, MultipleObjectsError
 
-from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
+from .utils import cp2k_basisset_file_iter, write_cp2k_basisset
 
 
 class BasisSet(Data):
@@ -70,8 +75,10 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from pydantic import BaseModel, ValidationError as PydanticValidationError
         from typing import List, Optional, Tuple
+
+        from pydantic import BaseModel
+        from pydantic import ValidationError as PydanticValidationError
 
         class BasisSetCoefficients(BaseModel):
             n: int

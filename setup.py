@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 
 import json
-from setuptools import setup, find_packages
 from pathlib import Path
+
+from setuptools import find_packages, setup
 
 CURRENT_DIR = Path(__file__).parent
 

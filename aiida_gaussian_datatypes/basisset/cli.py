@@ -10,11 +10,11 @@ import sys
 
 import click
 import tabulate
-
 from aiida.cmdline.commands.cmd_data import verdi_data
-from aiida.cmdline.utils import decorators, echo
 from aiida.cmdline.params import arguments, options
 from aiida.cmdline.params.types import DataParamType, GroupParamType
+from aiida.cmdline.utils import decorators, echo
+
 from ..utils import click_parse_range
 
 
@@ -139,8 +139,9 @@ def list_basisset(sym, name, tags):
     List Gaussian Basis Sets
     """
 
-    from aiida_gaussian_datatypes.basisset.data import BasisSet
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.basisset.data import BasisSet
 
     query = QueryBuilder()
     query.append(BasisSet)
@@ -181,8 +182,9 @@ def dump_basisset(sym, name, tags, output_format, data):
     Print specified Basis Sets
     """
 
-    from aiida_gaussian_datatypes.basisset.data import BasisSet
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.basisset.data import BasisSet
 
     writers = {
         "cp2k": BasisSet.to_cp2k,

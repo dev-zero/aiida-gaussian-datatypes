@@ -2,7 +2,10 @@ import unittest
 
 from six.moves import cStringIO as StringIO
 
-from aiida_gaussian_datatypes.basisset.utils import parse_single_cp2k_basisset, write_cp2k_basisset
+from aiida_gaussian_datatypes.basisset.utils import (
+    parse_single_cp2k_basisset,
+    write_cp2k_basisset,
+)
 
 from . import TEST_DIR
 

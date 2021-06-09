@@ -7,8 +7,8 @@ Gaussian Basis Set helper functions
 """
 
 import re
-from ..utils import SYM2NUM
 
+from ..utils import SYM2NUM
 
 EMPTY_LINE_MATCH = re.compile(r"^(\s*|\s*#.*)$")
 BLOCK_MATCH = re.compile(r"^\s*(?P<element>[a-zA-Z]{1,3})\s+(?P<family>\S+).*\n")

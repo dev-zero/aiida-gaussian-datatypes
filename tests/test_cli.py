@@ -1,11 +1,20 @@
 import subprocess as sp
 
+from aiida.backends.testbase import AiidaTestCase
 from click.testing import CliRunner
 
-from aiida.backends.testbase import AiidaTestCase
-
-from aiida_gaussian_datatypes.basisset.cli import cli as basisset_cli, list_basisset, import_basisset, dump_basisset
-from aiida_gaussian_datatypes.pseudopotential.cli import cli as pseudo_cli, list_pseudo, import_pseudo, dump_pseudo
+from aiida_gaussian_datatypes.basisset.cli import cli as basisset_cli
+from aiida_gaussian_datatypes.basisset.cli import (
+    dump_basisset,
+    import_basisset,
+    list_basisset,
+)
+from aiida_gaussian_datatypes.pseudopotential.cli import cli as pseudo_cli
+from aiida_gaussian_datatypes.pseudopotential.cli import (
+    dump_pseudo,
+    import_pseudo,
+    list_pseudo,
+)
 
 from . import TEST_DIR
 

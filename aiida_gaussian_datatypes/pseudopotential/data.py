@@ -6,11 +6,15 @@
 Gaussian Pseudopotential Data class
 """
 
+from aiida.common.exceptions import (
+    MultipleObjectsError,
+    NotExistent,
+    UniquenessError,
+    ValidationError,
+)
 from aiida.orm import Data, Group
-from aiida.common.exceptions import UniquenessError, ValidationError, NotExistent, MultipleObjectsError
 
-
-from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
+from .utils import cp2k_pseudo_file_iter, write_cp2k_pseudo
 
 
 class Pseudopotential(Data):
@@ -88,8 +92,10 @@ class Pseudopotential(Data):
     def _validate(self):
         super(Pseudopotential, self)._validate()
 
-        from pydantic import BaseModel, ValidationError as PydanticValidationError
         from typing import List
+
+        from pydantic import BaseModel
+        from pydantic import ValidationError as PydanticValidationError
 
         class PseudoDataLocal(BaseModel):
             r: float

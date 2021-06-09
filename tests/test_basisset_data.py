@@ -1,6 +1,6 @@
 import pytest
+from aiida.common.exceptions import NotExistent, ValidationError
 from aiida.plugins import DataFactory
-from aiida.common.exceptions import ValidationError, NotExistent
 
 from . import TEST_DIR
 
@@ -41,7 +41,7 @@ def test_n_orbital_functions():
 
 
 def test_get():
-    from aiida.common.exceptions import NotExistent, MultipleObjectsError
+    from aiida.common.exceptions import MultipleObjectsError, NotExistent
 
     BasisSet = DataFactory("gaussian.basisset")
 

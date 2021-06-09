@@ -1,6 +1,6 @@
 import pytest
+from aiida.common.exceptions import NotExistent, ValidationError
 from aiida.plugins import DataFactory
-from aiida.common.exceptions import ValidationError, NotExistent
 
 from . import TEST_DIR
 
@@ -48,7 +48,7 @@ def test_lookup():
 
 
 def test_get():
-    from aiida.common.exceptions import NotExistent, MultipleObjectsError
+    from aiida.common.exceptions import MultipleObjectsError, NotExistent
 
     Pseudo = DataFactory("gaussian.pseudo")
 

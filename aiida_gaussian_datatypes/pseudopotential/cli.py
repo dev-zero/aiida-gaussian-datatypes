@@ -10,11 +10,10 @@ import sys
 
 import click
 import tabulate
-
 from aiida.cmdline.commands.cmd_data import verdi_data
-from aiida.cmdline.utils import decorators, echo
 from aiida.cmdline.params import arguments, options
 from aiida.cmdline.params.types import DataParamType, GroupParamType
+from aiida.cmdline.utils import decorators, echo
 
 from ..utils import click_parse_range  # pylint: disable=relative-beyond-top-level
 
@@ -145,8 +144,9 @@ def list_pseudo(sym, name, tags):
     """
     List Gaussian Pseudopotentials
     """
-    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
 
     query = QueryBuilder()
     query.append(Pseudopotential)
@@ -187,8 +187,9 @@ def dump_pseudo(sym, name, tags, output_format, data):
     Print specified Pseudopotentials
     """
 
-    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
 
     writers = {
         "cp2k": Pseudopotential.to_cp2k,
