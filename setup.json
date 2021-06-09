@@ -37,7 +37,7 @@
     "reentry_register": true,
     "install_requires": [
         "pydantic >= 1.8.1",
-        "aiida-core >= 1.6.0"
+        "aiida-core >= 1.6.2"
     ],
     "extras_require": {
         "testing": [
