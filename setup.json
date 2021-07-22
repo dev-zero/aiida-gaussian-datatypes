@@ -37,7 +37,8 @@
     "reentry_register": true,
     "install_requires": [
         "pydantic >= 1.8.1",
-        "aiida-core >= 1.6.2"
+        "aiida-core >= 1.6.2",
+        "cp2k-input-tools >= 0.7.1"
     ],
     "extras_require": {
         "testing": [
