@@ -6,6 +6,8 @@
 Gaussian Basis Set Data Class
 """
 
+import dataclasses
+
 from aiida.common.exceptions import (
     MultipleObjectsError,
     NotExistent,
@@ -13,8 +15,6 @@ from aiida.common.exceptions import (
     ValidationError,
 )
 from aiida.orm import Data, Group
-
-from .utils import cp2k_basisset_file_iter, write_cp2k_basisset
 
 
 class BasisSet(Data):
@@ -75,37 +75,20 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from typing import List, Optional, Tuple
-
-        from pydantic import BaseModel
-        from pydantic import ValidationError as PydanticValidationError
-
-        class BasisSetCoefficients(BaseModel):
-            n: int
-            l: List[Tuple[int, int]]
-            coefficients: List[List[float]]
-
-            class Config:
-                validate_all = True
-                extra = "forbid"
-
-        class BasisSetData(BaseModel):
-            name: str
-            element: str
-            tags: List[str]
-            aliases: List[str]
-            n_el: Optional[int] = None
-            blocks: List[BasisSetCoefficients]
-            version: int
-
-            class Config:
-                validate_all = True
-                extra = "forbid"
+        # directly raises a ValidationError for the pseudo data if something's amiss
+        _dict2bsetdata(self.attributes)
 
         try:
-            BasisSetData.parse_obj(self.attributes)
-        except PydanticValidationError as exc:
-            raise ValidationError(str(exc))
+            assert isinstance(self.name, str) and self.name
+            assert (
+                isinstance(self.aliases, list)
+                and all(isinstance(alias, str) for alias in self.aliases)
+                and self.aliases
+            )
+            assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
+            assert isinstance(self.version, int) and self.version > 0
+        except AssertionError as exc:
+            raise ValidationError("Metadata validation failed") from exc
 
     @property
     def element(self):
@@ -259,6 +242,7 @@ class BasisSet(Data):
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
         :rtype: list
         """
+        from cp2k_input_tools.basissets import BasisSetData
 
         if not filters:
             filters = {}
@@ -274,7 +258,9 @@ class BasisSet(Data):
 
             return True
 
-        bsets = [bs for bs in cp2k_basisset_file_iter(fhandle) if matches_criteria(bs)]
+        bsets = [
+            bs for bs in (_bsetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)
+        ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             bsets = [bs for bs in bsets if not exists(bs)]
@@ -312,9 +298,10 @@ class BasisSet(Data):
         :param fhandle: A valid output file handle
         """
 
-        return write_cp2k_basisset(
-            fhandle, self.element, self.name, self.blocks, comment=f"from AiiDA BasisSet<uuid: {self.uuid}>"
-        )
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for line in _dict2bsetdata(self.attributes).cp2k_format_line_iter():
+            fhandle.write(line)
+            fhandle.write("\n")
 
     def get_matching_pseudopotential(self, *args, **kwargs):
         """
@@ -327,3 +314,33 @@ class BasisSet(Data):
             return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
         else:
             return Pseudopotential.get(element=self.element, *args, **kwargs)
+
+
+def _bsetdata2dict(bset):
+    aliases = sorted(bset.identifiers, key=lambda i: -len(i))
+    return {
+        "element": bset.element,
+        "name": aliases[0],
+        "aliases": aliases,
+        "tags": aliases[0].split("-"),
+        "n_el": bset.n_el,
+        "blocks": [dataclasses.asdict(block) for block in bset.blocks],
+        "version": 1,
+    }
+
+
+def _dict2bsetdata(data):
+    from cp2k_input_tools.basissets import BasisSetCoefficients, BasisSetData
+    from pydantic import ValidationError as PydanticValidationError
+
+    try:
+        return BasisSetData(
+            identifiers=data["aliases"],
+            element=data["element"],
+            n_el=data["n_el"],
+            blocks=[BasisSetCoefficients(**block) for block in data["blocks"]],
+        )
+    except (KeyError, TypeError) as exc:
+        raise ValidationError("one or more required keys could not be found in the current data") from exc
+    except PydanticValidationError as exc:
+        raise ValidationError("Basisset data validation failed") from exc
