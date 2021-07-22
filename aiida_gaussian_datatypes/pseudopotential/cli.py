@@ -31,12 +31,12 @@ def _formatted_table_import(pseudos):
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
-            ", ".join(f"{n}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
+            ", ".join(f"{n:2d}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
             pseudo.version,
         )
 
     table_content = [row(n, p) for n, p in enumerate(pseudos)]
-    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, d)", "Version"])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 def _formatted_table_list(pseudos):
@@ -48,12 +48,12 @@ def _formatted_table_list(pseudos):
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
-            ", ".join(f"{n}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
+            ", ".join(f"{n:2d}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
             pseudo.version,
         )
 
     table_content = [row(p) for p in pseudos]
-    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, d)", "Version"])
+    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 @verdi_data.group("gaussian.pseudo")
