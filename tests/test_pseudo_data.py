@@ -22,15 +22,15 @@ def test_import_from_cp2k():
     assert pseudos[0].label == pseudos[0].name
 
 
-def test_ignore_import_unsupported_from_cp2k():
-    """Some potential format are not yet supported, check that we do not choke on them"""
+def test_nlcc_import():
+    """With the usage of the cp2k-input-tools for file handling we also gained support for the NLCC pseudos"""
     Pseudopotential = DataFactory("gaussian.pseudo")
 
     with open(TEST_DIR.joinpath("NLCC_POTENTIALS"), "r") as fhandle:
         # get only the He PADE pseudo
         pseudos = Pseudopotential.from_cp2k(fhandle, filters={"element": lambda x: x == "C"})
 
-    assert len(pseudos) == 0
+    assert len(pseudos) == 1
 
 
 def test_lookup():
