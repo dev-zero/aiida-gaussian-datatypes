@@ -75,7 +75,7 @@ class TestCliBasisset(AiidaTestCase):
         result = self.cli_runner.invoke(dump_basisset, ["--format", "cp2k", "--sym", "H"])
 
         assert not result.exception
-        assert "H SZV-MOLOPT-GTH-q1" in result.output
+        assert "H  SZV-MOLOPT-GTH-q1" in result.output
 
 
 class TestCliPseudo(AiidaTestCase):
