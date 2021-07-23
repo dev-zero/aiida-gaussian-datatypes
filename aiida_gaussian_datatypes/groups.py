@@ -6,25 +6,24 @@
 Groups for the GTO data classes
 """
 
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, Generic, List, Optional, Sequence, Type, TypeVar
 
 from aiida.orm import Group, QueryBuilder, StructureData
 
+from .basisset.data import BasisSet
 from .pseudopotential.data import Pseudopotential
 
-
-class BasisSetGroup(Group):
-    """Group for Gaussian.Basisset nodes"""
+_T = TypeVar("_T")
 
 
-class PseudopotentialGroup(Group):
-    """Group for Gaussian.Pseudopotential nodes"""
+class _MemberMixin(Generic[_T]):
+    member_type: Type[_T]
 
-    def get_pseudos(
+    def get_members(
         self, elements: Optional[Sequence[str]] = None, structure: Optional[StructureData] = None
-    ) -> Dict[str, List[Pseudopotential]]:
+    ) -> Dict[str, List[_T]]:
         """
-        Return a dict of kind names/elements to a list of pseudopotential data nodes
+        Return a dict of kind names/elements to a list of respective data nodes
         for the given list of elements or structure.
 
         :param elements: list of element symbols.
@@ -42,12 +41,29 @@ class PseudopotentialGroup(Group):
         query = (
             QueryBuilder()
             .append(self.__class__, filters={"id": self.pk}, tag="group")
-            .append(Pseudopotential, with_group="group", filters={"attributes.element": {"in": elements}})
+            .append(self.member_type, with_group="group", filters={"attributes.element": {"in": elements}})
         )
 
-        pseudos: Dict[str, List[Pseudopotential]] = {}
+        pseudos: Dict[str, List[_T]] = {}
 
         for (pseudo,) in query.iterall():
             pseudos.setdefault(pseudo.element, []).append(pseudo)
 
         return pseudos
+
+
+class BasisSetGroup(Group, _MemberMixin):
+    """Group for Gaussian.Basisset nodes"""
+
+    member_type = BasisSet
+
+
+class PseudopotentialGroup(Group, _MemberMixin):
+    """Group for Gaussian.Pseudopotential nodes"""
+
+    member_type = Pseudopotential
+
+    def get_pseudos(
+        self, elements: Optional[Sequence[str]] = None, structure: Optional[StructureData] = None
+    ) -> Dict[str, List[_T]]:
+        return self.get_members(elements, structure)
