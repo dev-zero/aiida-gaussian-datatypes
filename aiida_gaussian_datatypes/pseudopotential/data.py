@@ -7,6 +7,7 @@ Gaussian Pseudopotential Data class
 """
 
 import dataclasses
+from decimal import Decimal
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -90,10 +91,10 @@ class Pseudopotential(Data):
     def _validate(self):
         super()._validate()
 
-        # directly raises a ValidationError for the pseudo data if something's amiss
-        _dict2pseudodata(self.attributes)
-
         try:
+            # directly raises a ValidationError for the pseudo data if something's amiss
+            _dict2pseudodata(self.attributes)
+
             assert isinstance(self.name, str) and self.name
             assert (
                 isinstance(self.aliases, list)
@@ -102,8 +103,8 @@ class Pseudopotential(Data):
             )
             assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
             assert isinstance(self.version, int) and self.version > 0
-        except AssertionError as exc:
-            raise ValidationError("Metadata validation failed") from exc
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
 
     @property
     def element(self):
@@ -287,10 +288,37 @@ class Pseudopotential(Data):
 
             return True
 
+        def dict_fact(data):
+            """
+            Convert the list of tuples to a dict with:
+            * Decimals replaced by strings
+            * the required attrs set on the root
+            * the key "coefficients" replaced with "coeffs"
+            """
+
+            def decimal2str(val):
+                if isinstance(val, Decimal):
+                    return str(val)
+
+                if isinstance(val, list) and val and isinstance(val[0], Decimal):
+                    return [str(v) for v in val]
+
+                return val
+
+            pseudo_dict = {k if k != "coefficients" else "coeffs": decimal2str(v) for k, v in data}
+
+            if "identifiers" in pseudo_dict:  # if this is the root dict, replace 'identifiers'
+                pseudo_dict["aliases"] = sorted(pseudo_dict.pop("identifiers"), key=lambda i: -len(i))
+                pseudo_dict["name"] = pseudo_dict["aliases"][0]
+                pseudo_dict["tags"] = pseudo_dict["name"].split("-")
+
+            return pseudo_dict
+
         pseudos = [
             p
             for p in (
-                _pseudodata2dict(p) for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
+                dataclasses.asdict(p, dict_factory=dict_fact)
+                for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
             )
             if matches_criteria(p)
         ]
@@ -349,48 +377,16 @@ class Pseudopotential(Data):
             return BasisSet.get(element=self.element, *args, **kwargs)
 
 
-def _pseudodata2dict(pseudo):
-    aliases = sorted(pseudo.identifiers, key=lambda i: -len(i))
-    return {
-        "element": pseudo.element,
-        "name": aliases[0],
-        "aliases": aliases,
-        "tags": aliases[0].split("-"),
-        "n_el": pseudo.n_el,
-        "local": {"r": pseudo.local.r, "coeffs": pseudo.local.coefficients},
-        "non_local": [
-            {"r": non_local.r, "coeffs": non_local.coefficients, "nproj": non_local.nproj}
-            for non_local in pseudo.non_local
-        ],
-        "nlcc": [dataclasses.asdict(n) for n in pseudo.nlcc],
-        "version": 1,
-    }
-
-
 def _dict2pseudodata(data):
     from cp2k_input_tools.pseudopotentials import (
         PseudopotentialData,
         PseudopotentialDataLocal,
-        PseudopotentialDataNLCC,
         PseudopotentialDataNonLocal,
     )
-    from pydantic import ValidationError as PydanticValidationError
 
-    try:
-        return PseudopotentialData(
-            identifiers=data["aliases"],
-            element=data["element"],
-            n_el=data["n_el"],
-            local=PseudopotentialDataLocal(r=data["local"]["r"], coefficients=data["local"]["coeffs"]),
-            non_local=[
-                PseudopotentialDataNonLocal(
-                    r=non_local["r"], coefficients=non_local["coeffs"], nproj=non_local["nproj"]
-                )
-                for non_local in data["non_local"]
-            ],
-            nlcc=[PseudopotentialDataNLCC(**nlcc) for nlcc in data.get("nlcc", [])],
-        )
-    except (KeyError, TypeError) as exc:
-        raise ValidationError("one or more required keys could not be found in the current data") from exc
-    except PydanticValidationError as exc:
-        raise ValidationError("Pseudopotential data validation failed") from exc
+    type_hooks = {
+        PseudopotentialDataLocal: lambda d: {"coefficients": d["coeffs"], **d},
+        PseudopotentialDataNonLocal: lambda d: {"coefficients": d["coeffs"], **d},
+    }
+
+    return PseudopotentialData.from_dict({"identifiers": data["aliases"], **data}, type_hooks=type_hooks)

@@ -7,6 +7,7 @@ Gaussian Basis Set Data Class
 """
 
 import dataclasses
+from decimal import Decimal
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -260,14 +261,39 @@ class BasisSet(Data):
 
             return True
 
-        def bsetdata2dict(bset):
-            bset_dict = dataclasses.asdict(bset)
-            bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
-            bset_dict["name"] = bset_dict["aliases"][0]
-            bset_dict["tags"] = bset_dict["name"].split("-")
+        def dict_fact(data):
+            """convert the list of tuples to a dict with Decimals replaced by strings and the required attrs set"""
+
+            def decimal2str(val):
+                if isinstance(val, Decimal):
+                    return str(val)
+
+                # list of of list of Decimals, and we have to make sure they are non-empty
+                if (
+                    isinstance(val, list)
+                    and val
+                    and isinstance(val[0], list)
+                    and val[0]
+                    and isinstance(val[0][0], Decimal)
+                ):
+                    return [[str(w) for w in v] for v in val]
+
+                return val
+
+            bset_dict = {k: decimal2str(v) for k, v in data}
+
+            if "identifiers" in bset_dict:  # if this is the root dict, replace 'identifiers'
+                bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
+                bset_dict["name"] = bset_dict["aliases"][0]
+                bset_dict["tags"] = bset_dict["name"].split("-")
+
             return bset_dict
 
-        bsets = [bs for bs in (bsetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)]
+        bsets = [
+            bs
+            for bs in (dataclasses.asdict(bs, dict_factory=dict_fact) for bs in BasisSetData.datafile_iter(fhandle))
+            if matches_criteria(bs)
+        ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             bsets = [bs for bs in bsets if not exists(bs)]
