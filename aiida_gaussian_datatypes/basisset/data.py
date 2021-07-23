@@ -75,10 +75,12 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        # directly raises a ValidationError for the pseudo data if something's amiss
-        _dict2bsetdata(self.attributes)
+        from cp2k_input_tools.basissets import BasisSetData
 
         try:
+            # directly raises an exception for the data if something's amiss, extra fields are ignored
+            BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
+
             assert isinstance(self.name, str) and self.name
             assert (
                 isinstance(self.aliases, list)
@@ -87,8 +89,8 @@ class BasisSet(Data):
             )
             assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
             assert isinstance(self.version, int) and self.version > 0
-        except AssertionError as exc:
-            raise ValidationError("Metadata validation failed") from exc
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
 
     @property
     def element(self):
@@ -258,9 +260,14 @@ class BasisSet(Data):
 
             return True
 
-        bsets = [
-            bs for bs in (_bsetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)
-        ]
+        def bsetdata2dict(bset):
+            bset_dict = dataclasses.asdict(bset)
+            bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
+            bset_dict["name"] = bset_dict["aliases"][0]
+            bset_dict["tags"] = bset_dict["name"].split("-")
+            return bset_dict
+
+        bsets = [bs for bs in (bsetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             bsets = [bs for bs in bsets if not exists(bs)]
@@ -297,9 +304,10 @@ class BasisSet(Data):
 
         :param fhandle: A valid output file handle
         """
+        from cp2k_input_tools.basissets import BasisSetData
 
         fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
-        for line in _dict2bsetdata(self.attributes).cp2k_format_line_iter():
+        for line in BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes}).cp2k_format_line_iter():
             fhandle.write(line)
             fhandle.write("\n")
 
@@ -314,33 +322,3 @@ class BasisSet(Data):
             return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
         else:
             return Pseudopotential.get(element=self.element, *args, **kwargs)
-
-
-def _bsetdata2dict(bset):
-    aliases = sorted(bset.identifiers, key=lambda i: -len(i))
-    return {
-        "element": bset.element,
-        "name": aliases[0],
-        "aliases": aliases,
-        "tags": aliases[0].split("-"),
-        "n_el": bset.n_el,
-        "blocks": [dataclasses.asdict(block) for block in bset.blocks],
-        "version": 1,
-    }
-
-
-def _dict2bsetdata(data):
-    from cp2k_input_tools.basissets import BasisSetCoefficients, BasisSetData
-    from pydantic import ValidationError as PydanticValidationError
-
-    try:
-        return BasisSetData(
-            identifiers=data["aliases"],
-            element=data["element"],
-            n_el=data["n_el"],
-            blocks=[BasisSetCoefficients(**block) for block in data["blocks"]],
-        )
-    except (KeyError, TypeError) as exc:
-        raise ValidationError("one or more required keys could not be found in the current data") from exc
-    except PydanticValidationError as exc:
-        raise ValidationError("Basisset data validation failed") from exc
