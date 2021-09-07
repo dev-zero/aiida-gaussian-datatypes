@@ -8,6 +8,7 @@ Gaussian Pseudopotential Data class
 
 import dataclasses
 from decimal import Decimal
+from icecream import ic
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -351,6 +352,44 @@ class Pseudopotential(Data):
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**p) for p in pseudos]
+
+    @classmethod
+    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
+        """
+        Constructs a list with pseudopotential objects from a Pseudopotential in GAMESS format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
+        :rtype: list
+        """
+
+        if not filters:
+            filters = {}
+
+        pseudos = [
+            p
+            for p in (
+                dataclasses.asdict(p, dict_factory=dict_fact)
+                for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
+            )
+            if matches_criteria(p)
+        ]
+
+        if duplicate_handling == "ignore":  # simply filter duplicates
+            pass
+
+        elif duplicate_handling == "error":
+            pass
+
+        elif duplicate_handling == "new":
+            pass
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return []
 
     def to_cp2k(self, fhandle):
         """
