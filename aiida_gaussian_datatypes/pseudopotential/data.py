@@ -32,9 +32,6 @@ class Pseudopotential(Data):
         aliases=None,
         tags=None,
         n_el=None,
-        local=None,
-        non_local=None,
-        nlcc=None,
         version=1,
         **kwargs,
     ):
@@ -57,18 +54,12 @@ class Pseudopotential(Data):
         if not n_el:
             n_el = []
 
-        if not non_local:
-            non_local = []
-
-        if not nlcc:
-            nlcc = []
-
         if "label" not in kwargs:
             kwargs["label"] = name
 
         super().__init__(**kwargs)
 
-        for attr in ("name", "element", "tags", "aliases", "n_el", "local", "non_local", "nlcc", "version"):
+        for attr in ("name", "element", "tags", "aliases", "n_el", "version"):
             self.set_attribute(attr, locals()[attr])
 
     def store(self, *args, **kwargs):
@@ -351,7 +342,7 @@ class Pseudopotential(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        return [cls(**p) for p in pseudos]
+        return [GTHPseudopotential(**p) for p in pseudos]
 
     @classmethod
     def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
@@ -365,17 +356,12 @@ class Pseudopotential(Data):
         :rtype: list
         """
 
-        if not filters:
-            filters = {}
+        for ii, line in enumerate(fhandle):
+            if len(line.strip()) == 0: continue
+            if ii == 0:
+                name, gen, core_electrons, number = line.split()
+                continue
 
-        pseudos = [
-            p
-            for p in (
-                dataclasses.asdict(p, dict_factory=dict_fact)
-                for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
-            )
-            if matches_criteria(p)
-        ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             pass
@@ -414,6 +400,78 @@ class Pseudopotential(Data):
             return BasisSet.get(element=self.element, n_el=sum(self.n_el), *args, **kwargs)
         else:
             return BasisSet.get(element=self.element, *args, **kwargs)
+
+
+class GTHPseudopotential(Pseudopotential):
+
+    def __init__(
+        self,
+        local=None,
+        non_local=None,
+        nlcc=None,
+        **kwargs):
+        """
+        :param element: string containing the name of the element
+        :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
+        :param aliases: alternative names
+        :param tags: additional tags
+        :param n_el: number of valence electrons covered by this basis set
+        :param local: see :py:attr:`~local`
+        :param local: see :py:attr:`~non_local`
+        """
+
+        if not non_local:
+            non_local = []
+
+        if not nlcc:
+            nlcc = []
+
+        super().__init__(**kwargs)
+
+        for attr in ("local", "non_local", "nlcc"):
+            self.set_attribute(attr, locals()[attr])
+
+    @property
+    def local(self):
+        """
+        Return the local part
+
+        The format of the returned dictionary::
+
+            {
+                'r': float,
+                'coeffs': [float, float, ...],
+            }
+
+        :rtype:dict
+        """
+        return self.get_attribute("local", None)
+
+    @property
+    def non_local(self):
+        """
+        Return a list of non-local projectors (for l=0,1...).
+
+        Each list element will have the following format::
+
+            {
+                'r': float,
+                'nproj': int,
+                'coeffs': [float, float, ...],  # only the upper-triangular elements
+            }
+
+        :rtype:list
+        """
+        return self.get_attribute("non_local", [])
+
+    @property
+    def nlcc(self):
+        """
+        Return a list of the non-local core-corrections data
+
+        :rtype:list
+        """
+        return self.get_attribute("nlcc", [])
 
 
 def _dict2pseudodata(data):
