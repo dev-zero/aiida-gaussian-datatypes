@@ -41,8 +41,6 @@ class Pseudopotential(Data):
         :param aliases: alternative names
         :param tags: additional tags
         :param n_el: number of valence electrons covered by this basis set
-        :param local: see :py:attr:`~local`
-        :param local: see :py:attr:`~non_local`
         """
 
         if not aliases:
@@ -85,7 +83,6 @@ class Pseudopotential(Data):
 
         try:
             # directly raises a ValidationError for the pseudo data if something's amiss
-            _dict2pseudodata(self.attributes)
 
             assert isinstance(self.name, str) and self.name
             assert (
@@ -151,48 +148,6 @@ class Pseudopotential(Data):
         """
 
         return self.get_attribute("n_el", [])
-
-    @property
-    def local(self):
-        """
-        Return the local part
-
-        The format of the returned dictionary::
-
-            {
-                'r': float,
-                'coeffs': [float, float, ...],
-            }
-
-        :rtype:dict
-        """
-        return self.get_attribute("local", None)
-
-    @property
-    def non_local(self):
-        """
-        Return a list of non-local projectors (for l=0,1...).
-
-        Each list element will have the following format::
-
-            {
-                'r': float,
-                'nproj': int,
-                'coeffs': [float, float, ...],  # only the upper-triangular elements
-            }
-
-        :rtype:list
-        """
-        return self.get_attribute("non_local", [])
-
-    @property
-    def nlcc(self):
-        """
-        Return a list of the non-local core-corrections data
-
-        :rtype:list
-        """
-        return self.get_attribute("nlcc", [])
 
     @classmethod
     def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
@@ -356,11 +311,33 @@ class Pseudopotential(Data):
         :rtype: list
         """
 
+        functions = []
+        ns = 0
         for ii, line in enumerate(fhandle):
             if len(line.strip()) == 0: continue
             if ii == 0:
                 name, gen, core_electrons, number = line.split()
                 continue
+            if ns == 0:
+                ns = int(line)
+                functions.append({"prefactors" : [],
+                                  "polynoms"   : [],
+                                  "exponents"  : []})
+            else:
+                for key, value in zip(("prefactors", "polynoms", "exponents"), map(float, line.split())):
+                    functions[-1][key].append(value)
+                ns -= 1
+
+        """
+        TODO properly extract name
+        """
+        element = name.split("-")[0]
+
+        data = {"functions" : functions,
+                "element"   : element,
+                "aliases"   : [name],
+                "name"      : name,
+                "n_el"      : [1]}
 
 
         if duplicate_handling == "ignore":  # simply filter duplicates
@@ -375,7 +352,7 @@ class Pseudopotential(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        return []
+        return [ECPPseudopotential(**data)]
 
     def to_cp2k(self, fhandle):
         """
@@ -472,6 +449,35 @@ class GTHPseudopotential(Pseudopotential):
         :rtype:list
         """
         return self.get_attribute("nlcc", [])
+
+    def _validate(self):
+        super()._validate()
+
+        try:
+            _dict2pseudodata(self.attributes)
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
+
+
+class ECPPseudopotential(Pseudopotential):
+
+    def __init__(
+        self,
+        functions=None,
+        lmax=1,
+        **kwargs):
+        """
+        :param functions:
+        :param lmax: maximum angular momentum
+        """
+
+        if not functions:
+            functions = []
+
+        super().__init__(**kwargs)
+
+        for attr in ("functions", "lmax"):
+            self.set_attribute(attr, locals()[attr])
 
 
 def _dict2pseudodata(data):

@@ -23,7 +23,8 @@
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
             "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.data:Pseudopotential",
-            "gaussian.gthpseudo = aiida_gaussian_datatypes.pseudopotential.data:GTHPseudopotential"
+            "gaussian.gthpseudo = aiida_gaussian_datatypes.pseudopotential.data:GTHPseudopotential",
+            "gaussian.ecppseudo = aiida_gaussian_datatypes.pseudopotential.data:ECPPseudopotential"
         ],
         "aiida.cmdline.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.cli:cli",
