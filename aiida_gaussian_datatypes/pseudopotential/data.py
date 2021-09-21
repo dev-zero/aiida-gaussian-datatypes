@@ -316,7 +316,7 @@ class Pseudopotential(Data):
         for ii, line in enumerate(fhandle):
             if len(line.strip()) == 0: continue
             if ii == 0:
-                name, gen, core_electrons, number = line.split()
+                name, gen, core_electrons, lmax = line.split()
                 continue
             if ns == 0:
                 ns = int(line)
@@ -328,15 +328,25 @@ class Pseudopotential(Data):
                     functions[-1][key].append(value)
                 ns -= 1
 
+                """
+                Cast polynoms to Integers
+                """
+                functions[-1]["polynoms"] = [ int(x) for x in functions[-1]["polynoms"] ]
+
         """
         TODO properly extract name
         """
         element = name.split("-")[0]
+        lmax = int(lmax)
+        core_electrons = int(core_electrons)
+
 
         data = {"functions" : functions,
                 "element"   : element,
                 "aliases"   : [name],
                 "name"      : name,
+                "core_electrons" : core_electrons,
+                "lmax"      : lmax,
                 "n_el"      : [1]}
 
 
@@ -352,7 +362,7 @@ class Pseudopotential(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        return [ECPPseudopotential(**data)]
+        return [SMPseudopotential(**data)]
 
     def to_cp2k(self, fhandle):
         """
@@ -361,10 +371,39 @@ class Pseudopotential(Data):
         :param fhandle: open file handle
         """
 
-        fhandle.write(f"# from AiiDA Pseudopotential<uuid: {self.uuid}>\n")
-        for line in _dict2pseudodata(self.attributes).cp2k_format_line_iter():
-            fhandle.write(line)
-            fhandle.write("\n")
+        if isinstance(self, GTHPseudopotential):
+
+            fhandle.write(f"# from AiiDA Pseudopotential<uuid: {self.uuid}>\n")
+            for line in _dict2pseudodata(self.attributes).cp2k_format_line_iter():
+                fhandle.write(line)
+                fhandle.write("\n")
+
+        else:
+            """
+            make an error
+            """
+            pass
+
+    def to_gamess(self, fhandle):
+        """
+        Write this Pseudopotential instance to a file in Gamess format.
+
+        :param fhandle: open file handle
+        """
+
+        if isinstance(self, SMPseudopotential):
+            fhandle.write(f"{self.name} GEN {self.core_electrons} {self.lmax}\n")
+            for fun in self.functions:
+                fhandle.write(f"{len(fun)}\n")
+                for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")]):
+                    fhandle.write(f"{prefactor:10.7f} {polynom:d} {exponent:10.7f}\n")
+
+
+        else:
+            """
+            make an error
+            """
+            pass
 
     def get_matching_basisset(self, *args, **kwargs):
         """
@@ -459,12 +498,13 @@ class GTHPseudopotential(Pseudopotential):
             raise ValidationError("One or more invalid fields found") from exc
 
 
-class ECPPseudopotential(Pseudopotential):
+class SMPseudopotential(Pseudopotential):
 
     def __init__(
         self,
         functions=None,
         lmax=1,
+        core_electrons=0,
         **kwargs):
         """
         :param functions:
@@ -476,8 +516,29 @@ class ECPPseudopotential(Pseudopotential):
 
         super().__init__(**kwargs)
 
-        for attr in ("functions", "lmax"):
+        for attr in ("functions", "lmax", "core_electrons"):
             self.set_attribute(attr, locals()[attr])
+
+    @property
+    def lmax(self):
+        """
+        :rtype:int
+        """
+        return self.get_attribute("lmax", [])
+
+    @property
+    def core_electrons(self):
+        """
+        :rtype:int
+        """
+        return self.get_attribute("core_electrons", [])
+
+    @property
+    def functions(self):
+        """
+        :rtype:int
+        """
+        return self.get_attribute("functions", [])
 
 
 def _dict2pseudodata(data):
