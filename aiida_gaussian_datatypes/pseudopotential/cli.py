@@ -28,6 +28,7 @@ def _formatted_table_import(pseudos):
     def row(num, pseudo):
         return (
             num + 1,
+            pseudo.__name__.replace("Pseudopotential", ""),
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
@@ -36,7 +37,7 @@ def _formatted_table_import(pseudos):
         )
 
     table_content = [row(n, p) for n, p in enumerate(pseudos)]
-    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Type", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 def _formatted_table_list(pseudos):
@@ -45,6 +46,7 @@ def _formatted_table_list(pseudos):
     def row(pseudo):
         return (
             pseudo.uuid,
+            pseudo.__name__.replace("Pseudopotential", ""),
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
@@ -53,7 +55,7 @@ def _formatted_table_list(pseudos):
         )
 
     table_content = [row(p) for p in pseudos]
-    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
+    return tabulate.tabulate(table_content, headers=["ID", "Type", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 @verdi_data.group("gaussian.pseudo")

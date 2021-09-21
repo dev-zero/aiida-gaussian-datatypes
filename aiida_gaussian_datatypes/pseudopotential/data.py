@@ -25,6 +25,8 @@ class Pseudopotential(Data):
     fixme: extend to NLCC pseudos.
     """
 
+    __name__ = "Pseudopotential"
+
     def __init__(
         self,
         element=None,
@@ -420,6 +422,8 @@ class Pseudopotential(Data):
 
 class GTHPseudopotential(Pseudopotential):
 
+    __name__ = "GTHPseudopotential"
+
     def __init__(
         self,
         local=None,
@@ -499,6 +503,8 @@ class GTHPseudopotential(Pseudopotential):
 
 
 class SMPseudopotential(Pseudopotential):
+
+    __name__ = "SMPseudopotential"
 
     def __init__(
         self,
