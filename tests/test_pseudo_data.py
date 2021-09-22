@@ -79,7 +79,7 @@ def test_validation_empty():
 
 
 def test_validation_invalid_local():
-    Pseudo = DataFactory("gaussian.pseudo")
+    Pseudo = DataFactory("gaussian.pseudo.gthpseudopotential")
     pseudo = Pseudo(name="test", element="H", local={"r": 1.23, "coeffs": [], "something": "else"})
 
     with pytest.raises(ValidationError):
