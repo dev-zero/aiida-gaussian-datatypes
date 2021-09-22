@@ -171,7 +171,7 @@ class Pseudopotential(Data):
             query.append(Group, filters={"label": group_label}, tag="group")
             params["with_group"] = "group"
 
-        query.append(Pseudopotential, **params)
+        query.append(cls, **params)
 
         filters = {"attributes.element": {"==": element}}
 
@@ -184,7 +184,7 @@ class Pseudopotential(Data):
             else:
                 filters["attributes.name"] = {"==": name}
 
-        query.add_filter(Pseudopotential, filters)
+        query.add_filter(cls, filters)
 
         # SQLA ORM only solution:
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
@@ -354,7 +354,6 @@ class Pseudopotential(Data):
                 "core_electrons" : core_electrons,
                 "lmax"           : lmax,
                 "n_el"           : None}
-
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             pass
