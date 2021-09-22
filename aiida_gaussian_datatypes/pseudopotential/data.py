@@ -313,6 +313,14 @@ class Pseudopotential(Data):
         :rtype: list
         """
 
+        def exists(pseudo):
+            try:
+                cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
         """
         Parser for Gamess format
         """
@@ -353,16 +361,24 @@ class Pseudopotential(Data):
                 "name"           : name,
                 "core_electrons" : core_electrons,
                 "lmax"           : lmax,
+                "version"        : 1,
                 "n_el"           : None}
 
         if duplicate_handling == "ignore":  # simply filter duplicates
-            pass
+            if exists(data):
+                return []
 
         elif duplicate_handling == "error":
-            pass
+            if exists(data):
+                raise UniquenessError(
+                    f"Gaussian Pseudopotential already exists for"
+                    f" element={data['element']}, name={data['name']}: {latest.uuid}"
+                )
 
         elif duplicate_handling == "new":
-            pass
+            if exists(data):
+                latest = cls.get(data["element"], data["name"], match_aliases=False)
+                data["version"] = latest.version + 1
 
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
