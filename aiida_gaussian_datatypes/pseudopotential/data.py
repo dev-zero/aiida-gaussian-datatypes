@@ -313,6 +313,10 @@ class Pseudopotential(Data):
         :rtype: list
         """
 
+        """
+        Parser for Gamess format
+        """
+
         functions = []
         ns = 0
         for ii, line in enumerate(fhandle):
@@ -343,13 +347,13 @@ class Pseudopotential(Data):
         core_electrons = int(core_electrons)
 
 
-        data = {"functions" : functions,
-                "element"   : element,
-                "aliases"   : [name],
-                "name"      : name,
+        data = {"functions"      : functions,
+                "element"        : element,
+                "aliases"        : [name],
+                "name"           : name,
                 "core_electrons" : core_electrons,
-                "lmax"      : lmax,
-                "n_el"      : [1]}
+                "lmax"           : lmax,
+                "n_el"           : None}
 
 
         if duplicate_handling == "ignore":  # simply filter duplicates
@@ -364,7 +368,7 @@ class Pseudopotential(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        return [SMPseudopotential(**data)]
+        return [ECPPseudopotential(**data)]
 
     def to_cp2k(self, fhandle):
         """
@@ -393,7 +397,7 @@ class Pseudopotential(Data):
         :param fhandle: open file handle
         """
 
-        if isinstance(self, SMPseudopotential):
+        if isinstance(self, ECPPseudopotential):
             fhandle.write(f"{self.name} GEN {self.core_electrons} {self.lmax}\n")
             for fun in self.functions:
                 fhandle.write(f"{len(fun)}\n")
@@ -431,11 +435,6 @@ class GTHPseudopotential(Pseudopotential):
         nlcc=None,
         **kwargs):
         """
-        :param element: string containing the name of the element
-        :param name: identifier for this basis set, usually something like <name>-<size>[-q<nvalence>]
-        :param aliases: alternative names
-        :param tags: additional tags
-        :param n_el: number of valence electrons covered by this basis set
         :param local: see :py:attr:`~local`
         :param local: see :py:attr:`~non_local`
         """
@@ -502,9 +501,9 @@ class GTHPseudopotential(Pseudopotential):
             raise ValidationError("One or more invalid fields found") from exc
 
 
-class SMPseudopotential(Pseudopotential):
+class ECPPseudopotential(Pseudopotential):
 
-    __name__ = "SMPseudopotential"
+    __name__ = "ECPPseudopotential"
 
     def __init__(
         self,
@@ -528,6 +527,8 @@ class SMPseudopotential(Pseudopotential):
     @property
     def lmax(self):
         """
+        Return maximum angular momentum
+
         :rtype:int
         """
         return self.get_attribute("lmax", [])
@@ -535,6 +536,8 @@ class SMPseudopotential(Pseudopotential):
     @property
     def core_electrons(self):
         """
+        Returns number of core electrons
+
         :rtype:int
         """
         return self.get_attribute("core_electrons", [])
@@ -542,7 +545,9 @@ class SMPseudopotential(Pseudopotential):
     @property
     def functions(self):
         """
-        :rtype:int
+        Returns list of basis functions
+
+        :rtype:list
         """
         return self.get_attribute("functions", [])
 

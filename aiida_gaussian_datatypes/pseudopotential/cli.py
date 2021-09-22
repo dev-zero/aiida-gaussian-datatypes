@@ -28,7 +28,7 @@ def _formatted_table_import(pseudos):
     def row(num, pseudo):
         return (
             num + 1,
-            pseudo.__name__.replace("Pseudopotential", ""),
+            pseudo.__name__.replace("Pseudopotential", "") if hasattr(pseudo, "__name__") else "",
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
@@ -46,7 +46,7 @@ def _formatted_table_list(pseudos):
     def row(pseudo):
         return (
             pseudo.uuid,
-            pseudo.__name__.replace("Pseudopotential", ""),
+            pseudo.__name__.replace("Pseudopotential", "") if hasattr(pseudo, "__name__") else "",
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
