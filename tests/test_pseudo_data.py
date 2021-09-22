@@ -94,3 +94,18 @@ def test_get_matching_empty():
 
     with pytest.raises(NotExistent):
         pseudos[0].get_matching_basisset()
+
+
+def test_import_from_gamess():
+    Pseudopotential = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GAMESS_ECP.B"), "r") as fhandle:
+        # get only the He PADE pseudo
+        pseudos = Pseudopotential.from_gamess( fhandle )
+
+    assert len(pseudos) == 1
+
+    pseudos[0].store()
+
+    # check that the name is used for the node label
+    assert pseudos[0].label == pseudos[0].name
