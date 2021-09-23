@@ -228,14 +228,3 @@ def dump_pseudo(sym, name, tags, output_format, data):
             echo.echo_info("Dumping {}/{} ({})...".format(pseudo.name, pseudo.element, pseudo.uuid), err=True)
 
         writers[output_format](pseudo, sys.stdout)
-
-# fmt: off
-@cli.command('install')
-@click.argument('pseudopotential_library', type=click.Choice(,)
-@decorators.with_dbenv()
-# fmt: on
-def install_family(pseudopotential_library):
-    """
-    Installs a family of pseudo potentials from a remote repository
-    """
-    pass
