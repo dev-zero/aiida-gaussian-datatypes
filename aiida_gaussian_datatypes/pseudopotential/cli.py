@@ -28,6 +28,7 @@ def _formatted_table_import(pseudos):
     def row(num, pseudo):
         return (
             num + 1,
+            pseudo.__name__.replace("Pseudopotential", "") if hasattr(pseudo, "__name__") else "",
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
@@ -36,7 +37,7 @@ def _formatted_table_import(pseudos):
         )
 
     table_content = [row(n, p) for n, p in enumerate(pseudos)]
-    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Type", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 def _formatted_table_list(pseudos):
@@ -45,6 +46,7 @@ def _formatted_table_list(pseudos):
     def row(pseudo):
         return (
             pseudo.uuid,
+            pseudo.__name__.replace("Pseudopotential", "") if hasattr(pseudo, "__name__") else "",
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
@@ -53,7 +55,7 @@ def _formatted_table_list(pseudos):
         )
 
     table_content = [row(p) for p in pseudos]
-    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
+    return tabulate.tabulate(table_content, headers=["ID", "Type", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 @verdi_data.group("gaussian.pseudo")
@@ -71,7 +73,7 @@ def cli():
     help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option(
     'fformat', '-f', '--format',
-    type=click.Choice(['cp2k', ]), default='cp2k',
+    type=click.Choice(['cp2k', 'gamess' ]), default='cp2k',
     help="the format of the pseudopotential file")
 @click.option(
     '--duplicates',
@@ -94,6 +96,7 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_i
 
     loaders = {
         "cp2k": Pseudopotential.from_cp2k,
+        "gamess": Pseudopotential.from_gamess,
     }
 
     filters = {
@@ -178,7 +181,8 @@ def list_pseudo(sym, name, tags):
               help="filter by name")
 @click.option('tags', '--tag', '-t', multiple=True,
               help="filter by a tag (all tags must be present if specified multiple times)")
-@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
+@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k',
+                                                                    'gamess']), default='cp2k',
               help="Chose the output format for the pseudopotentials: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
 # fmt: on
@@ -193,6 +197,7 @@ def dump_pseudo(sym, name, tags, output_format, data):
 
     writers = {
         "cp2k": Pseudopotential.to_cp2k,
+        "gamess": Pseudopotential.to_gamess,
     }
 
     if data:

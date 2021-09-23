@@ -8,6 +8,7 @@ Gaussian Pseudopotential Data class
 
 import dataclasses
 from decimal import Decimal
+from icecream import ic
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -24,6 +25,8 @@ class Pseudopotential(Data):
     fixme: extend to NLCC pseudos.
     """
 
+    __name__ = "Pseudopotential"
+
     def __init__(
         self,
         element=None,
@@ -31,9 +34,6 @@ class Pseudopotential(Data):
         aliases=None,
         tags=None,
         n_el=None,
-        local=None,
-        non_local=None,
-        nlcc=None,
         version=1,
         **kwargs,
     ):
@@ -43,8 +43,6 @@ class Pseudopotential(Data):
         :param aliases: alternative names
         :param tags: additional tags
         :param n_el: number of valence electrons covered by this basis set
-        :param local: see :py:attr:`~local`
-        :param local: see :py:attr:`~non_local`
         """
 
         if not aliases:
@@ -56,18 +54,12 @@ class Pseudopotential(Data):
         if not n_el:
             n_el = []
 
-        if not non_local:
-            non_local = []
-
-        if not nlcc:
-            nlcc = []
-
         if "label" not in kwargs:
             kwargs["label"] = name
 
         super().__init__(**kwargs)
 
-        for attr in ("name", "element", "tags", "aliases", "n_el", "local", "non_local", "nlcc", "version"):
+        for attr in ("name", "element", "tags", "aliases", "n_el", "version"):
             self.set_attribute(attr, locals()[attr])
 
     def store(self, *args, **kwargs):
@@ -93,7 +85,6 @@ class Pseudopotential(Data):
 
         try:
             # directly raises a ValidationError for the pseudo data if something's amiss
-            _dict2pseudodata(self.attributes)
 
             assert isinstance(self.name, str) and self.name
             assert (
@@ -160,48 +151,6 @@ class Pseudopotential(Data):
 
         return self.get_attribute("n_el", [])
 
-    @property
-    def local(self):
-        """
-        Return the local part
-
-        The format of the returned dictionary::
-
-            {
-                'r': float,
-                'coeffs': [float, float, ...],
-            }
-
-        :rtype:dict
-        """
-        return self.get_attribute("local", None)
-
-    @property
-    def non_local(self):
-        """
-        Return a list of non-local projectors (for l=0,1...).
-
-        Each list element will have the following format::
-
-            {
-                'r': float,
-                'nproj': int,
-                'coeffs': [float, float, ...],  # only the upper-triangular elements
-            }
-
-        :rtype:list
-        """
-        return self.get_attribute("non_local", [])
-
-    @property
-    def nlcc(self):
-        """
-        Return a list of the non-local core-corrections data
-
-        :rtype:list
-        """
-        return self.get_attribute("nlcc", [])
-
     @classmethod
     def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
         """
@@ -222,7 +171,7 @@ class Pseudopotential(Data):
             query.append(Group, filters={"label": group_label}, tag="group")
             params["with_group"] = "group"
 
-        query.append(Pseudopotential, **params)
+        query.append(cls, **params)
 
         filters = {"attributes.element": {"==": element}}
 
@@ -235,7 +184,7 @@ class Pseudopotential(Data):
             else:
                 filters["attributes.name"] = {"==": name}
 
-        query.add_filter(Pseudopotential, filters)
+        query.add_filter(cls, filters)
 
         # SQLA ORM only solution:
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
@@ -350,7 +299,91 @@ class Pseudopotential(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        return [cls(**p) for p in pseudos]
+        return [GTHPseudopotential(**p) for p in pseudos]
+
+    @classmethod
+    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
+        """
+        Constructs a list with pseudopotential objects from a Pseudopotential in GAMESS format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
+        :rtype: list
+        """
+
+        def exists(pseudo):
+            try:
+                cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        """
+        Parser for Gamess format
+        """
+
+        functions = []
+        ns = 0
+        for ii, line in enumerate(fhandle):
+            if len(line.strip()) == 0: continue
+            if ii == 0:
+                name, gen, core_electrons, lmax = line.split()
+                continue
+            if ns == 0:
+                ns = int(line)
+                functions.append({"prefactors" : [],
+                                  "polynoms"   : [],
+                                  "exponents"  : []})
+            else:
+                for key, value in zip(("prefactors", "polynoms", "exponents"), map(float, line.split())):
+                    functions[-1][key].append(value)
+                ns -= 1
+
+                """
+                Cast polynoms to Integers
+                """
+                functions[-1]["polynoms"] = [ int(x) for x in functions[-1]["polynoms"] ]
+
+        """
+        TODO properly extract name
+        """
+        element = name.split("-")[0]
+        lmax = int(lmax)
+        core_electrons = int(core_electrons)
+
+
+        data = {"functions"      : functions,
+                "element"        : element,
+                "aliases"        : [name],
+                "name"           : name,
+                "core_electrons" : core_electrons,
+                "lmax"           : lmax,
+                "version"        : 1,
+                "n_el"           : None}
+
+        if duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(data):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(data):
+                raise UniquenessError(
+                    f"Gaussian Pseudopotential already exists for"
+                    f" element={data['element']}, name={data['name']}: {latest.uuid}"
+                )
+
+        elif duplicate_handling == "new":
+            if exists(data):
+                latest = cls.get(data["element"], data["name"], match_aliases=False)
+                data["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return [ECPPseudopotential(**data)]
 
     def to_cp2k(self, fhandle):
         """
@@ -359,10 +392,39 @@ class Pseudopotential(Data):
         :param fhandle: open file handle
         """
 
-        fhandle.write(f"# from AiiDA Pseudopotential<uuid: {self.uuid}>\n")
-        for line in _dict2pseudodata(self.attributes).cp2k_format_line_iter():
-            fhandle.write(line)
-            fhandle.write("\n")
+        if isinstance(self, GTHPseudopotential):
+
+            fhandle.write(f"# from AiiDA Pseudopotential<uuid: {self.uuid}>\n")
+            for line in _dict2pseudodata(self.attributes).cp2k_format_line_iter():
+                fhandle.write(line)
+                fhandle.write("\n")
+
+        else:
+            """
+            make an error
+            """
+            pass
+
+    def to_gamess(self, fhandle):
+        """
+        Write this Pseudopotential instance to a file in Gamess format.
+
+        :param fhandle: open file handle
+        """
+
+        if isinstance(self, ECPPseudopotential):
+            fhandle.write(f"{self.name} GEN {self.core_electrons} {self.lmax}\n")
+            for fun in self.functions:
+                fhandle.write(f"{len(fun)}\n")
+                for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")]):
+                    fhandle.write(f"{prefactor:10.7f} {polynom:d} {exponent:10.7f}\n")
+
+
+        else:
+            """
+            make an error
+            """
+            pass
 
     def get_matching_basisset(self, *args, **kwargs):
         """
@@ -375,6 +437,134 @@ class Pseudopotential(Data):
             return BasisSet.get(element=self.element, n_el=sum(self.n_el), *args, **kwargs)
         else:
             return BasisSet.get(element=self.element, *args, **kwargs)
+
+
+class GTHPseudopotential(Pseudopotential):
+
+    __name__ = "GTHPseudopotential"
+
+    def __init__(
+        self,
+        local=None,
+        non_local=None,
+        nlcc=None,
+        **kwargs):
+        """
+        :param local: see :py:attr:`~local`
+        :param local: see :py:attr:`~non_local`
+        """
+
+        if not non_local:
+            non_local = []
+
+        if not nlcc:
+            nlcc = []
+
+        super().__init__(**kwargs)
+
+        for attr in ("local", "non_local", "nlcc"):
+            self.set_attribute(attr, locals()[attr])
+
+    @property
+    def local(self):
+        """
+        Return the local part
+
+        The format of the returned dictionary::
+
+            {
+                'r': float,
+                'coeffs': [float, float, ...],
+            }
+
+        :rtype:dict
+        """
+        return self.get_attribute("local", None)
+
+    @property
+    def non_local(self):
+        """
+        Return a list of non-local projectors (for l=0,1...).
+
+        Each list element will have the following format::
+
+            {
+                'r': float,
+                'nproj': int,
+                'coeffs': [float, float, ...],  # only the upper-triangular elements
+            }
+
+        :rtype:list
+        """
+        return self.get_attribute("non_local", [])
+
+    @property
+    def nlcc(self):
+        """
+        Return a list of the non-local core-corrections data
+
+        :rtype:list
+        """
+        return self.get_attribute("nlcc", [])
+
+    def _validate(self):
+        super()._validate()
+
+        try:
+            _dict2pseudodata(self.attributes)
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
+
+
+class ECPPseudopotential(Pseudopotential):
+
+    __name__ = "ECPPseudopotential"
+
+    def __init__(
+        self,
+        functions=None,
+        lmax=1,
+        core_electrons=0,
+        **kwargs):
+        """
+        :param functions:
+        :param lmax: maximum angular momentum
+        """
+
+        if not functions:
+            functions = []
+
+        super().__init__(**kwargs)
+
+        for attr in ("functions", "lmax", "core_electrons"):
+            self.set_attribute(attr, locals()[attr])
+
+    @property
+    def lmax(self):
+        """
+        Return maximum angular momentum
+
+        :rtype:int
+        """
+        return self.get_attribute("lmax", [])
+
+    @property
+    def core_electrons(self):
+        """
+        Returns number of core electrons
+
+        :rtype:int
+        """
+        return self.get_attribute("core_electrons", [])
+
+    @property
+    def functions(self):
+        """
+        Returns list of basis functions
+
+        :rtype:list
+        """
+        return self.get_attribute("functions", [])
 
 
 def _dict2pseudodata(data):

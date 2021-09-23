@@ -33,10 +33,11 @@ def test_pseudopotential_group_get():
     pseudogroup.add_nodes([pseudo.store() for pseudo in pseudos])
 
     retrieved_pseudos = pseudogroup.get_pseudos(elements=["Li", "H"])
+    retrieved_pseudos = {key: {x for x in val} for key, val in retrieved_pseudos.items()}
 
     assert retrieved_pseudos == {
-        "Li": [p for p in pseudos if p.element == "Li"],
-        "H": [p for p in pseudos if p.element == "H"],
+        "Li": {p for p in pseudos if p.element == "Li"},
+        "H": {p for p in pseudos if p.element == "H"},
     }
 
 
@@ -66,8 +67,9 @@ def test_pseudopotential_group_get_structure():
     structure.append_atom(position=(0.500, 0.500, 0.500), symbols="H")
 
     retrieved_pseudos = pseudogroup.get_pseudos(structure=structure)
+    retrieved_pseudos = {key: {x for x in val} for key, val in retrieved_pseudos.items()}
 
     assert retrieved_pseudos == {
-        "Li": [p for p in pseudos if p.element == "Li"],
-        "H": [p for p in pseudos if p.element == "H"],
+        "Li": {p for p in pseudos if p.element == "Li"},
+        "H": {p for p in pseudos if p.element == "H"},
     }
