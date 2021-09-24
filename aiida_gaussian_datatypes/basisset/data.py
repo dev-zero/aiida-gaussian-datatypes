@@ -325,9 +325,9 @@ class BasisSet(Data):
         return [cls(**bs) for bs in bsets]
 
     @classmethod
-    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", element = None):
+    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", element = None):
         """
-        Constructs a list with basis set objects from a Basis Set in GAMESS format
+        Constructs a list with basis set objects from a Basis Set in NWCHEM format
 
         :param fhandle: open file handle
         :param filters: a dict with attribute filter functions
@@ -340,8 +340,10 @@ class BasisSet(Data):
 
 
         """
-        GAMESS parser
+        NWCHEM parser
         """
+        for line in fhande:
+
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             #bsets = [bs for bs in bsets if not exists(bs)]
