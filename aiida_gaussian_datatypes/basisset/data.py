@@ -236,7 +236,7 @@ class BasisSet(Data):
         return items[0][0]
 
     @classmethod
-    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore"):
+    def from_cp2k(cls, fhandle, filters=None, duplicate_handling="ignore", element = None):
         """
         Constructs a list with basis set objects from a Basis Set in CP2K format
 
@@ -323,6 +323,57 @@ class BasisSet(Data):
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**bs) for bs in bsets]
+
+    @classmethod
+    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", element = None):
+        """
+        Constructs a list with basis set objects from a Basis Set in GAMESS format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
+        """
+
+        if not element:
+            raise ValueError(f"Element has to be set!")
+
+
+        """
+        GAMESS parser
+        """
+
+        if duplicate_handling == "ignore":  # simply filter duplicates
+            #bsets = [bs for bs in bsets if not exists(bs)]
+            pass
+
+        elif duplicate_handling == "error":
+            #for bset in bsets:
+            #    try:
+            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
+            #    except NotExistent:
+            #        pass
+            #    else:
+            #        raise UniquenessError(
+            #            f"Gaussian Basis Set already exists for"
+            #            f" element={bset['element']}, name={bset['name']}: {latest.uuid}"
+            #        )
+            pass
+
+        elif duplicate_handling == "new":
+            #for bset in bsets:
+            #    try:
+            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
+            #    except NotExistent:
+            #        pass
+            #    else:
+            #        bset["version"] = latest.version + 1
+            pass
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return []
 
     def to_cp2k(self, fhandle):
         """
