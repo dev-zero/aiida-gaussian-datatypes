@@ -65,7 +65,7 @@ class MitasLibrary(_ExternalLibrary):
             typ = str(p.parent.name)
             typ_path = str(p.parent.name)
 
-            if re.match("[A-z]{1,2}\.[A-z\-]*cc-.*\.gamess", p.name):
+            if re.match("[A-z]{1,2}\.[A-z\-]*cc-.*\.nwchem", p.name):
                 nature = "basis"
             elif re.match("[A-z]{1,2}\.ccECP\.gamess", p.name):
                 nature = "pseudos"
@@ -91,17 +91,8 @@ class MitasLibrary(_ExternalLibrary):
         git.Repo.clone_from(cls._URL, tempdir)
 
         for p in (tempdir/"recipes").glob("**/*"):
-            if str(p.name).lower().endswith(".gamess"):
+            if str(p.name).lower().endswith(".gamess") or str(p.name).lower().endswith(".nwchem"):
                 add_row(p)
 
         return elements
-#                        elements = {el: {**data,
-#-                         "types" : {x.name: {"path": x,
-#-                                             "basis": [ b for b in x.iterdir() if re.match("[A-z]{1,2}\.[A-z\-]*cc-.*\.gamess", b.name)],
-#-                                             "pseudo": [ b for b in x.iterdir() if re.match(, b.name)]} for x in data["file"].iterdir() if x.is_dir()}} for el, data in elements.items()}
-#-        return elements
-
-
-
-
 

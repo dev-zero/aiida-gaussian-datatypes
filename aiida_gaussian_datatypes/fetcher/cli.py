@@ -53,6 +53,7 @@ def _formatted_table_import(elements):
                 element,
                 t,
                 p,
+                re.match("[A-z]{1,2}\.(.+).nwchem", b).group(1),
                 b
             )
 
@@ -66,7 +67,7 @@ def _formatted_table_import(elements):
                 table_content.append(row(ii, e, t, p.name, b.name))
 
     #table_content = [row(n, p, v) for n, (p, v) in enumerate(elements.items())]
-    return tabulate.tabulate(table_content, headers=["Nr.", "Element", "Type", "Pseudo", "Basis"])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Element", "Type", "PseudoFile", "Basis", "BasisFile"])
 
 @verdi_data.group("gaussian")
 def cli():
