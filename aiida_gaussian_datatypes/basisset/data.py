@@ -86,7 +86,6 @@ class BasisSet(Data):
             BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
 
             #assert isinstance(self.name, str) and self.name
-            ic(self.aliases)
             assert (
                 isinstance(self.aliases, list)
                 and all(isinstance(alias, str) for alias in self.aliases)
