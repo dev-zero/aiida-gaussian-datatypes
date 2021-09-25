@@ -14,8 +14,11 @@ from aiida.common.exceptions import (
     NotExistent,
     UniquenessError,
     ValidationError,
+    ParsingError
 )
+import re
 from aiida.orm import Data, Group
+from icecream import ic
 
 
 class BasisSet(Data):
@@ -82,14 +85,15 @@ class BasisSet(Data):
             # directly raises an exception for the data if something's amiss, extra fields are ignored
             BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
 
-            assert isinstance(self.name, str) and self.name
+            #assert isinstance(self.name, str) and self.name
+            ic(self.aliases)
             assert (
                 isinstance(self.aliases, list)
                 and all(isinstance(alias, str) for alias in self.aliases)
                 and self.aliases
             )
-            assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
-            assert isinstance(self.version, int) and self.version > 0
+            #assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
+            #assert isinstance(self.version, int) and self.version > 0
         except Exception as exc:
             raise ValidationError("One or more invalid fields found") from exc
 
@@ -323,6 +327,105 @@ class BasisSet(Data):
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**bs) for bs in bsets]
+
+    @classmethod
+    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore"):
+        """
+        Constructs a list with basis set objects from a Basis Set in NWCHEM format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
+        """
+
+
+        """
+        NWCHEM parser
+        """
+
+        element = None
+        data = []
+        blocks = []
+
+        def block_creator(b, orb, blocks = blocks):
+            orb_dict = {"s" : 0,
+                        "p" : 1,
+                        "d" : 2,
+                        "f" : 3,
+                        "g" : 4,
+                        "h" : 5,
+                        "i" : 6 }
+            block = { "n": 0, # I dont know how to setup main quantum number
+                      "l": [(orb_dict[orb], len(data))],
+                      "coefficients" : [ [ d["exp"], d["cont"] ] for d in b ] }
+            blocks.append(block)
+
+        for line in fhandle:
+            """
+            Element symbol has to be every block
+            """
+            if re.match("^[A-z ]+$", line):
+                if len(data) != 0:
+                    block_creator(data, orb)
+                    data = []
+                el, orb, = line.lower().split()
+                if element is None:
+                    """
+                    TODO check validity of element
+                    """
+                    element = el
+                elif element != el:
+                    raise ParsingError(f"Element previous {element}, and now {el}.") # Element cannot be changed
+            if re.match("^[+-.0-9 ]+$", line):
+                exp, cont, = [ float(x) for x in line.split() ]
+                data.append({"exp" : exp,
+                             "cont" : cont })
+        if len(data) != 0:
+            block_creator(data, orb)
+            data = []
+
+        if duplicate_handling == "ignore":  # simply filter duplicates
+            #bsets = [bs for bs in bsets if not exists(bs)]
+            pass
+
+        elif duplicate_handling == "error":
+            #for bset in bsets:
+            #    try:
+            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
+            #    except NotExistent:
+            #        pass
+            #    else:
+            #        raise UniquenessError(
+            #            f"Gaussian Basis Set already exists for"
+            #            f" element={bset['element']}, name={bset['name']}: {latest.uuid}"
+            #        )
+            pass
+
+        elif duplicate_handling == "new":
+            #for bset in bsets:
+            #    try:
+            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
+            #    except NotExistent:
+            #        pass
+            #    else:
+            #        bset["version"] = latest.version + 1
+            pass
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        basis = {"element" : element.capitalize(),
+                 "version" : 1,
+                 "tags" : [],
+                 "aliases" : ["nwchem"],
+                 "blocks" : blocks }
+
+        if hasattr(fhandle, "name"):
+            basis["name"] = fhandle.name
+            basis["aliases"].append(fhandle.name.replace(".nwchem", ""))
+
+        return [cls(**basis)]
 
     def to_cp2k(self, fhandle):
         """
