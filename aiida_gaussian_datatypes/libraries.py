@@ -82,7 +82,8 @@ class MitasLibrary(_ExternalLibrary):
             if typ not in elements[element]["types"]:
                 elements[element]["types"][typ] = {"path": typ_path,
                                                    "basis": [],
-                                                   "pseudos": []}
+                                                   "pseudos": [],
+                                                   "tags": ["ECP", typ, ]}
 
             elements[element]["types"][typ][nature].append(p)
 

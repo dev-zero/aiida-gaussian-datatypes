@@ -18,6 +18,7 @@ from aiida.common.exceptions import (
 )
 import re
 from aiida.orm import Data, Group
+from pathlib import Path
 from icecream import ic
 
 
@@ -328,7 +329,7 @@ class BasisSet(Data):
         return [cls(**bs) for bs in bsets]
 
     @classmethod
-    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore"):
+    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", name = None):
         """
         Constructs a list with basis set objects from a Basis Set in NWCHEM format
 
@@ -416,13 +417,16 @@ class BasisSet(Data):
 
         basis = {"element" : element.capitalize(),
                  "version" : 1,
+                 "name" : "unknown",
                  "tags" : [],
-                 "aliases" : ["nwchem"],
+                 "aliases" : [""],
                  "blocks" : blocks }
 
-        if hasattr(fhandle, "name"):
-            basis["name"] = fhandle.name
-            basis["aliases"].append(fhandle.name.replace(".nwchem", ""))
+        if name is not None:
+            basis["name"] = name
+        elif hasattr(fhandle, "name"):
+            basis["name"] = Path(fhandle.name).name.replace(".nwchem", "")
+            basis["aliases"].append(basis["name"].split(".")[-1])
 
         return [cls(**basis)]
 
