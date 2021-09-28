@@ -85,7 +85,7 @@ def _formatted_table_import(elements):
                 continue
             p = d["types"][t]["pseudos"][0]
             for b in d["types"][t]["basis"]:
-                table_content.append(row(ii, e, t, p.name, d["types"][t]["tags"], b.name))
+                table_content.append(row(ii, e, t, p["path"].name, d["types"][t]["tags"], b["path"].name))
 
     #table_content = [row(n, p, v) for n, (p, v) in enumerate(elements.items())]
     return tabulate.tabulate(table_content, headers=["Nr.", "Element", "Type", "PseudoFile", "Tags", "Basis", "BasisFile"])
@@ -124,6 +124,7 @@ def install_family(library):
         echo.echo("DONE")
 
     elements = LibraryBookKeeper.get_library_by_name(library).fetch()
+
     elements = [ [el, p] for el, p in sorted(elements.items(), key = lambda x: SYM2NUM[x[0]]) ]
     echo.echo_info(f"Found {len(elements)} elements")
     echo.echo(_formatted_table_import(elements))
@@ -147,8 +148,8 @@ def install_family(library):
                         echo.echo_info(f"Adding Basis for: ", nl=False)
                         echo.echo(f"{basis.element} ({basis.name})...  ", nl=False)
                         basis.tags.extend(o["tags"])
-                        basis.store()
-                        basisgroup.add_nodes([basis])
+                        #basis.store()
+                        #basisgroup.add_nodes([basis])
                         echo.echo("Imported")
                     except UniquenessError:
                         echo.echo("Skipping (already in)")
@@ -165,8 +166,8 @@ def install_family(library):
                         echo.echo_info(f"Adding Basis for: ", nl=False)
                         echo.echo(f"{pseudo.element} ({pseudo.name})...  ", nl=False)
                         pseudo.tags.extend(o["tags"])
-                        pseudo.store()
-                        pseudogroup.add_nodes([pseudo])
+                        #pseudo.store()
+                        #pseudogroup.add_nodes([pseudo])
                         echo.echo("Imported")
                     except UniquenessError:
                         echo.echo("Skipping (already in)")

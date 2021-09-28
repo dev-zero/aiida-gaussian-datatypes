@@ -7,6 +7,7 @@ Gaussian Pseudopotential Data class
 """
 
 import dataclasses
+from ..utils import SYM2NUM
 from decimal import Decimal
 from icecream import ic
 
@@ -34,6 +35,7 @@ class Pseudopotential(Data):
         aliases=None,
         tags=None,
         n_el=None,
+        n_el_tot=None,
         version=1,
         **kwargs,
     ):
@@ -53,13 +55,18 @@ class Pseudopotential(Data):
 
         if not n_el:
             n_el = []
+        else:
+            if not n_el_tot:
+                n_el_tot = sum(n_el)
+            else:
+                raise #TODO a propiate error here
 
         if "label" not in kwargs:
             kwargs["label"] = name
 
         super().__init__(**kwargs)
 
-        for attr in ("name", "element", "tags", "aliases", "n_el", "version"):
+        for attr in ("name", "element", "tags", "aliases", "n_el", "n_el_tot", "version"):
             self.set_attribute(attr, locals()[attr])
 
     def store(self, *args, **kwargs):
@@ -94,6 +101,8 @@ class Pseudopotential(Data):
             )
             assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
             assert isinstance(self.version, int) and self.version > 0
+            if len(self.n_el) != 0:
+                assert(sum(self.n_el) == self.n_el_tot)
         except Exception as exc:
             raise ValidationError("One or more invalid fields found") from exc
 
@@ -150,6 +159,15 @@ class Pseudopotential(Data):
         """
 
         return self.get_attribute("n_el", [])
+
+    @property
+    def n_el_tot(self):
+        """
+        Return the number of electrons per angular momentum
+        :rtype:int
+        """
+
+        return self.get_attribute("n_el_tot", [])
 
     @classmethod
     def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
@@ -362,7 +380,8 @@ class Pseudopotential(Data):
                 "core_electrons" : core_electrons,
                 "lmax"           : lmax,
                 "version"        : 1,
-                "n_el"           : None}
+                "n_el"           : None,
+                "n_el_tot"       : SYM2NUM[element] - core_electrons}
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             if exists(data):
