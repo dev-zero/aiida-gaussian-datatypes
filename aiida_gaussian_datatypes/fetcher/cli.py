@@ -85,7 +85,9 @@ def _formatted_table_import(elements):
                 continue
             p = d["types"][t]["pseudos"][0]
             for b in d["types"][t]["basis"]:
-                table_content.append(row(ii, e, t, p["path"].name, d["types"][t]["tags"], b["path"].name))
+                table_content.append(row(ii, e, t, p["path"].name,
+                                         d["types"][t]["tags"],
+                                         b["path"].name))
 
     #table_content = [row(n, p, v) for n, (p, v) in enumerate(elements.items())]
     return tabulate.tabulate(table_content, headers=["Nr.", "Element", "Type", "PseudoFile", "Tags", "Basis", "BasisFile"])
@@ -137,40 +139,27 @@ def install_family(library):
         e, v = elements[idx]
         for t, o in v["types"].items():
             for b in o["basis"]:
-                with open(str(b), "r") as fhandle:
-                    try:
-                        basis, = BasisSet.from_nwchem(fhandle,
-                                                      duplicate_handling = "new",
-                                                      name = f"{t}.{Path(fhandle.name).name}"
-                                                     )
-                        if basis is None:
-                            continue
-                        echo.echo_info(f"Adding Basis for: ", nl=False)
-                        echo.echo(f"{basis.element} ({basis.name})...  ", nl=False)
-                        basis.tags.extend(o["tags"])
-                        #basis.store()
-                        #basisgroup.add_nodes([basis])
-                        echo.echo("Imported")
-                    except UniquenessError:
-                        echo.echo("Skipping (already in)")
-                    except Exception as e:
-                        echo.echo("Skipping (something went wrong)")
+                basis = b["obj"]
+                echo.echo_info(f"Adding Basis for: ", nl=False)
+                echo.echo(f"{basis.element} ({basis.name})...  ", nl=False)
+                try:
+                    basis.store()
+                    basisgroup.add_nodes([basis])
+                    echo.echo("Imported")
+                except UniquenessError:
+                    echo.echo("Skipping (already in)")
+                except Exception as e:
+                    echo.echo("Skipping (something went wrong)")
             for p in o["pseudos"]:
-                with open(str(p), "r") as fhandle:
-                    try:
-                        pseudo, = Pseudopotential.from_gamess(fhandle,
-                                                              duplicate_handling = "new"
-                                                             )
-                        if pseudo is None:
-                            continue
-                        echo.echo_info(f"Adding Basis for: ", nl=False)
-                        echo.echo(f"{pseudo.element} ({pseudo.name})...  ", nl=False)
-                        pseudo.tags.extend(o["tags"])
-                        #pseudo.store()
-                        #pseudogroup.add_nodes([pseudo])
-                        echo.echo("Imported")
-                    except UniquenessError:
-                        echo.echo("Skipping (already in)")
-                    except Exception as e:
-                        echo.echo("Skipping (something went wrong)")
+                pseudo = p["obj"]
+                echo.echo_info(f"Adding Basis for: ", nl=False)
+                echo.echo(f"{pseudo.element} ({pseudo.name})...  ", nl=False)
+                try:
+                    pseudo.store()
+                    pseudogroup.add_nodes([pseudo])
+                    echo.echo("Imported")
+                except UniquenessError:
+                    echo.echo("Skipping (already in)")
+                except Exception as e:
+                    echo.echo("Skipping (something went wrong)")
 

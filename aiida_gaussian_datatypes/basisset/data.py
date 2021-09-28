@@ -329,7 +329,7 @@ class BasisSet(Data):
         return [cls(**bs) for bs in bsets]
 
     @classmethod
-    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", name = None):
+    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", attrs = None):
         """
         Constructs a list with basis set objects from a Basis Set in NWCHEM format
 
@@ -347,6 +347,9 @@ class BasisSet(Data):
         element = None
         data = []
         blocks = []
+
+        if not attrs:
+            attrs = {}
 
         def block_creator(b, orb, blocks = blocks):
             orb_dict = {"s" : 0,
@@ -415,18 +418,30 @@ class BasisSet(Data):
         else:
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
-        basis = {"element" : element.capitalize(),
-                 "version" : 1,
-                 "name" : "unknown",
-                 "tags" : [],
-                 "aliases" : [""],
-                 "blocks" : blocks }
+        try:
+            basis = {"element" : element.capitalize(),
+                     "version" : 1,
+                     "name" : "unknown",
+                     "tags" : [],
+                     "aliases" : [],
+                     "blocks" : blocks }
+        except:
+            return []
 
-        if name is not None:
-            basis["name"] = name
-        elif hasattr(fhandle, "name"):
+        if hasattr(fhandle, "name"):
             basis["name"] = Path(fhandle.name).name.replace(".nwchem", "")
             basis["aliases"].append(basis["name"].split(".")[-1])
+
+        if "name" in attrs:
+            basis["aliases"].append(basis["name"])
+            basis["name"] = attrs["name"]
+
+        for attr in ("n_el", "tags",):
+            if attr in attrs:
+                basis[attr] = attrs[attr]
+
+        if len(basis["aliases"]) == 0:
+            del basis["aliases"]
 
         return [cls(**basis)]
 

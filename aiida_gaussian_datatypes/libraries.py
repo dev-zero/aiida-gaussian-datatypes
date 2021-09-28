@@ -57,7 +57,7 @@ class MitasLibrary(_ExternalLibrary):
     def fetch(cls):
 
         elements = {}
-        def add_row(p, elements = elements):
+        def add_data(p, elements = elements):
             element = str(p.parent.parent.name)
             if element not in utils.SYM2NUM: # Check if element is valid
                 return
@@ -66,15 +66,36 @@ class MitasLibrary(_ExternalLibrary):
             typ = str(p.parent.name)
             typ_path = str(p.parent.name)
 
-            if re.match("[A-z]{1,2}\.[A-z\-]*cc-.*\.nwchem", p.name):
-                nature = "basis"
-            elif re.match("[A-z]{1,2}\.ccECP\.gamess", p.name):
-                nature = "pseudos"
-            else:
-                """
-                If does not match these regexes do nothing
-                """
-                return
+            tags = ["ECP", typ, ]
+
+            """ Load Pseudopotential first """
+            with open(p, "r") as fhandle:
+                pseudo, = Pseudopotential.from_gamess(fhandle,
+                                                      duplicate_handling = "new")
+            tags.append(f"q{pseudo.n_el_tot}")
+            tags.append(f"c{pseudo.core_electrons}")
+            pseudo.tags.extend(tags)
+
+            pseudos = [{"path": p,
+                        "obj": pseudo}]
+
+
+            """ Load Basis sets """
+            basis = []
+            for r in (p.parent).glob("**/*"):
+                if re.match("[A-z]{1,2}\.[A-z\-]*cc-.*\.nwchem", r.name):
+                    name = re.match("[A-z]{1,2}\.([A-z\-]*cc-.*)\.nwchem", r.name).group(1)
+                    name = f"{typ}-{name}"
+                    with open(r, "r") as fhandle:
+                        b = BasisSet.from_nwchem(fhandle,
+                                                 duplicate_handling = "new",
+                                                 attrs = {"n_el": pseudo.n_el_tot,
+                                                          "name": name,
+                                                          "tags": tags})
+                        if len(b) == 0: continue
+                        b, = b
+                    basis.append({"path": r,
+                                  "obj": b})
 
             if element not in elements:
                 elements[element] = {"path": element_path,
@@ -82,58 +103,16 @@ class MitasLibrary(_ExternalLibrary):
 
             if typ not in elements[element]["types"]:
                 elements[element]["types"][typ] = {"path": typ_path,
-                                                   "basis": [],
-                                                   "pseudos": [],
-                                                   "tags": ["ECP", typ, ]}
-            val = {}
-            val["path"] = p
-            with open(p, "r") as fhandle:
-                if nature == "basis":
-                    try:
-                        obj, = BasisSet.from_nwchem(fhandle,
-                                                   duplicate_handling = "new")
-                    except:
-                        """
-                        Something went wrong in the import, continuing ...
-                        """
-                        return
-                    tags = ["aug"]
-                elif nature == "pseudos":
-                    try:
-                        obj, = Pseudopotential.from_gamess(fhandle,
-                                                          duplicate_handling = "new")
-                    except:
-                        """
-                        Something went wrong in the import, continuing ...
-                        """
-                        return
-                    tags = []
-                else:
-                    raise # TODO give here an error
-            obj.tags.extend(tags)
-            val["obj"] = obj
-            val["tags"] = tags
-            elements[element]["types"][typ][nature].append(val)
-
+                                                   "basis": basis,
+                                                   "pseudos": pseudos,
+                                                   "tags": tags}
 
         tempdir = pathlib.Path(tempfile.mkdtemp())
         git.Repo.clone_from(cls._URL, tempdir)
 
         for p in (tempdir/"recipes").glob("**/*"):
-            if str(p.name).lower().endswith(".gamess") or str(p.name).lower().endswith(".nwchem"):
-                add_row(p)
-
-        """ Update valence electrons """
-        for e in elements:
-            for t in elements[e]["types"]:
-                if len(elements[e]["types"][t]["pseudos"]) == 1:
-                    tags = [f'q{elements[e]["types"][t]["pseudos"][0]["obj"].n_el_tot}',
-                            f'c{elements[e]["types"][t]["pseudos"][0]["obj"].core_electrons}'
-                           ]
-                    elements[e]["types"][t]["tags"].extend(tags)
-                    for ii, b in enumerate(elements[e]["types"][t]["basis"]):
-                        elements[e]["types"][t]["basis"][ii]["obj"].n_el = elements[e]["types"][t]["pseudos"][0]["obj"].n_el_tot
-
+            if re.match("[A-z]{1,2}\.ccECP\.gamess", p.name):
+                add_data(p)
 
         return elements
 
