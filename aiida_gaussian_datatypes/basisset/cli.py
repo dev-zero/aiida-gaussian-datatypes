@@ -175,7 +175,7 @@ def list_basisset(sym, name, tags):
               help="filter by name")
 @click.option('tags', '--tag', '-t', multiple=True,
               help="filter by a tag (all tags must be present if specified multiple times)")
-@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
+@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', 'nwchem']), default='cp2k',
               help="Chose the output format for the basiset: " + ', '.join(['cp2k', ]))
 # fmt: on
 @decorators.with_dbenv()
@@ -190,6 +190,7 @@ def dump_basisset(sym, name, tags, output_format, data):
 
     writers = {
         "cp2k": BasisSet.to_cp2k,
+        "nwchem" : BasisSet.to_nwchem,
     }
 
     if data:

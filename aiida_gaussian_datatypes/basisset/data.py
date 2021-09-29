@@ -342,6 +342,8 @@ class BasisSet(Data):
 
         """
         NWCHEM parser
+
+        TODO Maybe parser should move to "parsers"
         """
 
         element = None
@@ -360,7 +362,7 @@ class BasisSet(Data):
                         "h" : 5,
                         "i" : 6 }
             block = { "n": 0, # I dont know how to setup main quantum number
-                      "l": [(orb_dict[orb], len(data))],
+                      "l": [(orb_dict[orb], 1)],
                       "coefficients" : [ [ d["exp"], d["cont"] ] for d in b ] }
             blocks.append(block)
 
@@ -457,6 +459,33 @@ class BasisSet(Data):
         for line in BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes}).cp2k_format_line_iter():
             fhandle.write(line)
             fhandle.write("\n")
+
+    def to_nwchem(self, fhandle):
+        """
+        Write the Basis Set to the passed file handle in the format expected by NWCHEM.
+
+        :param fhandle: A valid output file handle
+        """
+        orb_dict = {0 : "s",
+                    1 : "p",
+                    2 : "d",
+                    3 : "f",
+                    4 : "g",
+                    5 : "h",
+                    6 : "i" }
+
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for block in self.blocks:
+            offset = 0
+            for orb, num, in block["l"]:
+                fhandle.write(f"{self.element} {orb_dict[orb]}\n")
+                for lnum in range(num):
+                    for entry in block["coefficients"]:
+                        exponent = entry[0]
+                        coefficient = entry[1 + lnum + offset]
+                        fhandle.write(f"  {exponent:15.7f} {coefficient:15.7f}\n")
+                offset = num
+
 
     def get_matching_pseudopotential(self, *args, **kwargs):
         """
