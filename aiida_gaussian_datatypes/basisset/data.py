@@ -22,7 +22,7 @@ from pathlib import Path
 from icecream import ic
 
 
-class BasisSet(Data):
+class BasisSetCommon(Data):
     """
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
@@ -49,7 +49,7 @@ class BasisSet(Data):
         if "label" not in kwargs:
             kwargs["label"] = name
 
-        super(BasisSet, self).__init__(**kwargs)
+        super(BasisSetCommon, self).__init__(**kwargs)
 
         self.set_attribute("name", name)
         self.set_attribute("element", element)
@@ -60,25 +60,10 @@ class BasisSet(Data):
         self.set_attribute("version", version)
 
     def store(self, *args, **kwargs):
-        """
-        Store the node, ensuring that the combination (element,name,version) is unique.
-        """
-        # TODO: this uniqueness check is not race-condition free.
-
-        try:
-            existing = self.get(self.element, self.name, self.version, match_aliases=False)
-        except NotExistent:
-            pass
-        else:
-            raise UniquenessError(
-                f"Gaussian Basis Set already exists for"
-                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
-            )
-
-        return super(BasisSet, self).store(*args, **kwargs)
+        return super(BasisSetCommon, self).store(*args, **kwargs)
 
     def _validate(self):
-        super(BasisSet, self)._validate()
+        super(BasisSetCommon, self)._validate()
 
         from cp2k_input_tools.basissets import BasisSetData
 
@@ -524,3 +509,34 @@ class BasisSet(Data):
             return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
         else:
             return Pseudopotential.get(element=self.element, *args, **kwargs)
+
+class BasisSet(BasisSetCommon):
+
+    def __init__(self, *args, **kwargs):
+        super(BasisSet, self).__init__(*args, **kwargs)
+
+    def store(self, *args, **kwargs):
+        """
+        Store the node, ensuring that the combination (element,name,version) is unique.
+        """
+        # TODO: this uniqueness check is not race-condition free.
+
+        try:
+            existing = self.get(self.element, self.name, self.version, match_aliases=False)
+        except NotExistent:
+            pass
+        else:
+            raise UniquenessError(
+                f"Gaussian Basis Set already exists for"
+                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
+            )
+
+        return super(BasisSet, self).store(*args, **kwargs)
+
+class BasisSetFree(BasisSetCommon):
+
+    def __init__(self, *args, **kwargs):
+        super(BasisSetFree, self).__init__(*args, **kwargs)
+
+    def store(self, *args, **kwargs):
+        return super(BasisSetFree, self).store(*args, **kwargs)

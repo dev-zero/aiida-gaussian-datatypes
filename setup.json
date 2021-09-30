@@ -22,6 +22,7 @@
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
+            "gaussian.basissetfree = aiida_gaussian_datatypes.basisset.data:BasisSetFree",
             "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.data:Pseudopotential",
             "gaussian.pseudo.gthpseudopotential = aiida_gaussian_datatypes.pseudopotential.data:GTHPseudopotential",
             "gaussian.pseudo.ecppseudopotential = aiida_gaussian_datatypes.pseudopotential.data:ECPPseudopotential"
@@ -34,6 +35,9 @@
         "aiida.groups": [
             "gaussian.basisset = aiida_gaussian_datatypes.groups:BasisSetGroup",
             "gaussian.pseudo = aiida_gaussian_datatypes.groups:PseudopotentialGroup"
+        ],
+        "aiida.calculations": [
+            "gaussian.uncontract = aiida_gaussian_datatypes.calc.uncontract:uncontract"
         ]
     },
     "scripts": [],
