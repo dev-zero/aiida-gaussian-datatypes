@@ -184,7 +184,8 @@ def list_pseudo(sym, name, tags):
 @click.option('tags', '--tag', '-t', multiple=True,
               help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option('output_format', '-f', '--format', type=click.Choice(['cp2k',
-                                                                    'gamess']), default='cp2k',
+                                                                    'gamess',
+                                                                    'turborvb']), default='cp2k',
               help="Chose the output format for the pseudopotentials: " + ', '.join(['cp2k', ]))
 @decorators.with_dbenv()
 # fmt: on
@@ -200,6 +201,7 @@ def dump_pseudo(sym, name, tags, output_format, data):
     writers = {
         "cp2k": Pseudopotential.to_cp2k,
         "gamess": Pseudopotential.to_gamess,
+        "turborvb": Pseudopotential.to_turborvb,
     }
 
     if data:

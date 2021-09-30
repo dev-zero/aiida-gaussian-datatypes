@@ -443,9 +443,32 @@ class Pseudopotential(Data):
             fhandle.write(f"{self.name} GEN {self.core_electrons} {self.lmax}\n")
             functions = [self.functions[-1]] + self.functions[:-1]
             for fun in functions:
-                fhandle.write(f"{len(fun)}\n")
+                fhandle.write(f"{len(fun['polynoms'])}\n")
                 for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")]):
-                    fhandle.write(f"{prefactor:10.7f} {polynom:d} {exponent:10.7f}\n")
+                    fhandle.write(f"{prefactor:12.7f} {polynom:4d} {exponent:12.7f}\n")
+
+
+        else:
+            """
+            make an error
+            """
+            pass
+
+    def to_turborvb(self, fhandle):
+        """
+        Write this Pseudopotential instance to a file in TurboRVB format.
+
+        :param fhandle: open file handle
+        """
+
+        if isinstance(self, ECPPseudopotential):
+            fhandle.write(f"GEN\n")
+            fhandle.write(f"1 0 {self.lmax}\n")
+            fhandle.write(" ".join([ f"{len(x['polynoms'])}" for x in self.functions ]))
+            fhandle.write("\n")
+            for fun in self.functions:
+                for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")]):
+                    fhandle.write(f"{prefactor:12.7f} {polynom:4d} {exponent:12.7f}\n")
 
 
         else:
