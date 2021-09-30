@@ -366,6 +366,14 @@ class Pseudopotential(Data):
                 functions[-1]["polynoms"] = [ int(x) for x in functions[-1]["polynoms"] ]
 
         """
+        Change the order of functions so they match orbital momentum
+
+        In GAMESS format first block represents upper most lmax
+        and then the rest s, p, d, ...
+        """
+        functions = functions[1:] + [functions[0]]
+
+        """
         TODO properly extract name
         """
         element = name.split("-")[0]
@@ -433,7 +441,8 @@ class Pseudopotential(Data):
 
         if isinstance(self, ECPPseudopotential):
             fhandle.write(f"{self.name} GEN {self.core_electrons} {self.lmax}\n")
-            for fun in self.functions:
+            functions = [self.functions[-1]] + self.functions[:-1]
+            for fun in functions:
                 fhandle.write(f"{len(fun)}\n")
                 for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")]):
                     fhandle.write(f"{prefactor:10.7f} {polynom:d} {exponent:10.7f}\n")
