@@ -320,7 +320,7 @@ class Pseudopotential(Data):
         return [GTHPseudopotential(**p) for p in pseudos]
 
     @classmethod
-    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False):
+    def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False, attrs = None):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in GAMESS format
 
@@ -338,6 +338,9 @@ class Pseudopotential(Data):
                 return False
 
             return True
+
+        if not attrs:
+            attrs = {}
 
         """
         Parser for Gamess format
@@ -376,6 +379,7 @@ class Pseudopotential(Data):
         """
         TODO properly extract name
         """
+
         element = name.split("-")[0]
         lmax = int(lmax)
         core_electrons = int(core_electrons)
@@ -390,6 +394,10 @@ class Pseudopotential(Data):
                 "version"        : 1,
                 "n_el"           : None,
                 "n_el_tot"       : SYM2NUM[element] - core_electrons}
+
+        if "name" in attrs:
+            data["aliases"].append(data["name"])
+            data["name"] = attrs["name"]
 
         if duplicate_handling == "force-ignore":  # This will be checked at the store stage
             pass

@@ -2,6 +2,7 @@
 
 import click
 import tabulate
+import pydriller
 from pathlib import Path
 from aiida.cmdline.utils import decorators, echo
 from aiida.cmdline.commands.cmd_data import verdi_data

@@ -71,7 +71,8 @@ class QmcpackLibrary(_ExternalLibrary):
             """ Load Pseudopotential first """
             with open(p, "r") as fhandle:
                 pseudo, = Pseudopotential.from_gamess(fhandle,
-                                                      duplicate_handling = "force-ignore")
+                                                      duplicate_handling = "force-ignore",
+                                                      attrs = {"name" : typ })
             tags.append(f"q{pseudo.n_el_tot}")
             tags.append(f"c{pseudo.core_electrons}")
             pseudo.tags.extend(tags)
