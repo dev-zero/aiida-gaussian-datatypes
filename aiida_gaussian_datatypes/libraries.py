@@ -78,21 +78,12 @@ class QmcpackLibrary(_ExternalLibrary):
                 pseudo, = Pseudopotential.from_gamess(fhandle,
                                                       duplicate_handling = "force-ignore",
                                                       attrs = {"name" : typ })
-
             commithash = ""
-            for commit in pydriller.Repository(str(tempdir), filepath=str(p)).traverse_commits():
+            for version, commit in enumerate(pydriller.Repository(str(tempdir), filepath=str(p)).traverse_commits()):
                 commithash = commit.hash
             if commithash == "": return
             pseudo.extras["commithash"] = commithash
-
-            try:
-                latest = ECPPseudopotential.get(pseudo.element,
-                                                pseudo.name)
-                pseudo.version = latest.version
-                if latest.extras["commithash"] != commithash:
-                    pseudo.version += 1
-            except NotExistent:
-                pass
+            pseudo.attributes["version"] = version + 1
 
             tags.append(f"q{pseudo.n_el_tot}")
             tags.append(f"c{pseudo.core_electrons}")
@@ -117,19 +108,11 @@ class QmcpackLibrary(_ExternalLibrary):
                         b, = b
 
                         commithash = ""
-                        for commit in pydriller.Repository(str(tempdir), filepath=str(r)).traverse_commits():
+                        for version, commit in enumerate(pydriller.Repository(str(tempdir), filepath=str(r)).traverse_commits()):
                             commithash = commit.hash
                         if commithash == "": return
                         b.extras["commithash"] = commithash
-
-                        try:
-                            latest = BasisSet.get(b.element,
-                                                  b.name)
-                            b.version = latest.version
-                            if latest.extras["commithash"] != commithash:
-                                b.version += 1
-                        except NotExistent:
-                            pass
+                        b.attributes["version"] = version + 1
 
                     basis.append({"path": r,
                                   "obj": b})
