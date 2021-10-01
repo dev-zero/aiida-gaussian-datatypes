@@ -49,7 +49,7 @@ class EmptyLibrary(_ExternalLibrary):
     pass
 
 @LibraryBookKeeper.register_library
-class MitasLibrary(_ExternalLibrary):
+class QmcpackLibrary(_ExternalLibrary):
 
     _URL = "https://github.com/QMCPACK/pseudopotentiallibrary.git"
 
