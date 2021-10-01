@@ -407,7 +407,10 @@ class BasisSetCommon(Data):
         if len(basis["aliases"]) == 0:
             del basis["aliases"]
 
-        if duplicate_handling == "ignore":  # simply filter duplicates
+        if duplicate_handling == "force-ignore":  # It will check at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
             if exists(basis):
                 return []
 

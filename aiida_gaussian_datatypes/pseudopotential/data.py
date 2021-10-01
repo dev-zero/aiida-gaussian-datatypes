@@ -391,7 +391,10 @@ class Pseudopotential(Data):
                 "n_el"           : None,
                 "n_el_tot"       : SYM2NUM[element] - core_electrons}
 
-        if duplicate_handling == "ignore":  # simply filter duplicates
+        if duplicate_handling == "force-ignore":  # This will be checked at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
             if exists(data):
                 return []
 

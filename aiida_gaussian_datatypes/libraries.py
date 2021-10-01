@@ -71,14 +71,13 @@ class QmcpackLibrary(_ExternalLibrary):
             """ Load Pseudopotential first """
             with open(p, "r") as fhandle:
                 pseudo, = Pseudopotential.from_gamess(fhandle,
-                                                      duplicate_handling = "new")
+                                                      duplicate_handling = "force-ignore")
             tags.append(f"q{pseudo.n_el_tot}")
             tags.append(f"c{pseudo.core_electrons}")
             pseudo.tags.extend(tags)
 
             pseudos = [{"path": p,
                         "obj": pseudo}]
-
 
             """ Load Basis sets """
             basis = []
@@ -88,7 +87,7 @@ class QmcpackLibrary(_ExternalLibrary):
                     name = f"{typ}-{name}"
                     with open(r, "r") as fhandle:
                         b = BasisSet.from_nwchem(fhandle,
-                                                 duplicate_handling = "new",
+                                                 duplicate_handling = "force-ignore",
                                                  attrs = {"n_el": pseudo.n_el_tot,
                                                           "name": name,
                                                           "tags": tags})
