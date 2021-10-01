@@ -324,6 +324,13 @@ class BasisSetCommon(Data):
         :rtype: list
         """
 
+        def exists(bset):
+            try:
+                cls.get(bset["element"], bset["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
 
         """
         NWCHEM parser
@@ -375,36 +382,6 @@ class BasisSetCommon(Data):
             block_creator(data, orb)
             data = []
 
-        if duplicate_handling == "ignore":  # simply filter duplicates
-            #bsets = [bs for bs in bsets if not exists(bs)]
-            pass
-
-        elif duplicate_handling == "error":
-            #for bset in bsets:
-            #    try:
-            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
-            #    except NotExistent:
-            #        pass
-            #    else:
-            #        raise UniquenessError(
-            #            f"Gaussian Basis Set already exists for"
-            #            f" element={bset['element']}, name={bset['name']}: {latest.uuid}"
-            #        )
-            pass
-
-        elif duplicate_handling == "new":
-            #for bset in bsets:
-            #    try:
-            #        latest = cls.get(bset["element"], bset["name"], match_aliases=False)
-            #    except NotExistent:
-            #        pass
-            #    else:
-            #        bset["version"] = latest.version + 1
-            pass
-
-        else:
-            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
-
         try:
             basis = {"element" : element.capitalize(),
                      "version" : 1,
@@ -429,6 +406,26 @@ class BasisSetCommon(Data):
 
         if len(basis["aliases"]) == 0:
             del basis["aliases"]
+
+        if duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(basis):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(basis):
+                raise UniquenessError( f"Gaussian Basis Set already exists for"
+                                       f" element={basis['element']}, name={basis['name']}: {latest.uuid}")
+
+        elif duplicate_handling == "new":
+                try:
+                    latest = cls.get(basis["element"], basis["name"], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    basis["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [cls(**basis)]
 
