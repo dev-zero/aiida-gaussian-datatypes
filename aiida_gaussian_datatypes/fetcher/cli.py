@@ -153,7 +153,7 @@ def install_family(library):
                     echo.echo("Skipping (something went wrong)")
             for p in o["pseudos"]:
                 pseudo = p["obj"]
-                echo.echo_info(f"Adding Basis for: ", nl=False)
+                echo.echo_info(f"Adding Pseudopotential for: ", nl=False)
                 echo.echo(f"{pseudo.element} ({pseudo.name})...  ", nl=False)
                 try:
                     pseudo.store()
