@@ -369,6 +369,8 @@ def _pseudodata2dict(data: PseudopotentialData) -> Dict[str, Any]:
                 stack.append(val)
             elif isinstance(val, Decimal):
                 current[key] = str(val)
+            elif isinstance(val, list) and val and isinstance(val[0], dict):
+                stack += val
             elif isinstance(val, list) and val and isinstance(val[0], Decimal):
                 current[key] = [str(v) for v in val]
 

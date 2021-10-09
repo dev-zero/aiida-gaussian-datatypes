@@ -332,6 +332,8 @@ def _basissetdata2dict(data: BasisSetData) -> Dict[str, Any]:
                 stack.append(val)
             elif isinstance(val, Decimal):
                 current[key] = str(val)
+            elif isinstance(val, list) and val and isinstance(val[0], dict):
+                stack += val
             elif (
                 isinstance(val, list) and val and isinstance(val[0], list) and val[0] and isinstance(val[0][0], Decimal)
             ):
