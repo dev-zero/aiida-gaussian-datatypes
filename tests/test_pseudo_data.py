@@ -1,3 +1,5 @@
+import io
+
 import pytest
 from aiida.common.exceptions import NotExistent, ValidationError
 from aiida.plugins import DataFactory
@@ -94,3 +96,32 @@ def test_get_matching_empty():
 
     with pytest.raises(NotExistent):
         pseudos[0].get_matching_basisset()
+
+
+def test_to_cp2k():
+    """Check whether writing a CP2K datafile works"""
+    Pseudo = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GTH_POTENTIALS.LiH"), "r") as fhandle:
+        pseudos = Pseudo.from_cp2k(fhandle)
+
+    fhandle = io.StringIO()
+    for pseudo in pseudos:
+        pseudo.to_cp2k(fhandle)
+
+    assert fhandle.getvalue()
+
+
+def test_to_cp2k_nlcc_missing():
+    """Check whether writing a CP2K datafile works, also with missing NLCC attribute"""
+    Pseudo = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GTH_POTENTIALS.LiH"), "r") as fhandle:
+        pseudos = Pseudo.from_cp2k(fhandle)
+
+    fhandle = io.StringIO()
+    for pseudo in pseudos:
+        del pseudo.attributes["nlcc"]
+        pseudo.to_cp2k(fhandle)
+
+    assert fhandle.getvalue()

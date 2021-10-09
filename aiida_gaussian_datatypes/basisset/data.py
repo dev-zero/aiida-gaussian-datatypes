@@ -6,8 +6,8 @@
 Gaussian Basis Set Data Class
 """
 
-import dataclasses
 from decimal import Decimal
+from typing import Any, Dict
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -16,6 +16,7 @@ from aiida.common.exceptions import (
     ValidationError,
 )
 from aiida.orm import Data, Group
+from cp2k_input_tools.basissets import BasisSetData
 
 
 class BasisSet(Data):
@@ -76,11 +77,9 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from cp2k_input_tools.basissets import BasisSetData
-
         try:
             # directly raises an exception for the data if something's amiss, extra fields are ignored
-            BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
+            _dict2basissetdata(self.attributes)
 
             assert isinstance(self.name, str) and self.name
             assert (
@@ -245,8 +244,6 @@ class BasisSet(Data):
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
         :rtype: list
         """
-        from cp2k_input_tools.basissets import BasisSetData
-
         if not filters:
             filters = {}
 
@@ -261,38 +258,8 @@ class BasisSet(Data):
 
             return True
 
-        def dict_fact(data):
-            """convert the list of tuples to a dict with Decimals replaced by strings and the required attrs set"""
-
-            def decimal2str(val):
-                if isinstance(val, Decimal):
-                    return str(val)
-
-                # list of of list of Decimals, and we have to make sure they are non-empty
-                if (
-                    isinstance(val, list)
-                    and val
-                    and isinstance(val[0], list)
-                    and val[0]
-                    and isinstance(val[0][0], Decimal)
-                ):
-                    return [[str(w) for w in v] for v in val]
-
-                return val
-
-            bset_dict = {k: decimal2str(v) for k, v in data}
-
-            if "identifiers" in bset_dict:  # if this is the root dict, replace 'identifiers'
-                bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
-                bset_dict["name"] = bset_dict["aliases"][0]
-                bset_dict["tags"] = bset_dict["name"].split("-")
-
-            return bset_dict
-
         bsets = [
-            bs
-            for bs in (dataclasses.asdict(bs, dict_factory=dict_fact) for bs in BasisSetData.datafile_iter(fhandle))
-            if matches_criteria(bs)
+            bs for bs in (_basissetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)
         ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
@@ -330,10 +297,8 @@ class BasisSet(Data):
 
         :param fhandle: A valid output file handle
         """
-        from cp2k_input_tools.basissets import BasisSetData
-
         fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
-        for line in BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes}).cp2k_format_line_iter():
+        for line in _dict2basissetdata(self.attributes).cp2k_format_line_iter():
             fhandle.write(line)
             fhandle.write("\n")
 
@@ -348,3 +313,38 @@ class BasisSet(Data):
             return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
         else:
             return Pseudopotential.get(element=self.element, *args, **kwargs)
+
+
+def _basissetdata2dict(data: BasisSetData) -> Dict[str, Any]:
+    """
+    Convert a BasisSetData to a compatible dict with:
+    * Decimals replaced by strings
+    * the required attrs set on the root
+    * the key "coefficients" replaced with "coeffs"
+    """
+
+    bset_dict = data.dict()
+    stack = [bset_dict]
+    while stack:
+        current = stack.pop()
+        for key, val in current.items():
+            if isinstance(val, dict):
+                stack.append(val)
+            elif isinstance(val, Decimal):
+                current[key] = str(val)
+            elif (
+                isinstance(val, list) and val and isinstance(val[0], list) and val[0] and isinstance(val[0][0], Decimal)
+            ):
+                current[key] = [[str(w) for w in v] for v in val]
+
+    bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
+    bset_dict["name"] = bset_dict["aliases"][0]
+    bset_dict["tags"] = bset_dict["name"].split("-")
+
+    return bset_dict
+
+
+def _dict2basissetdata(data: BasisSetData) -> Dict[str, Any]:
+    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version")}
+    obj["identifiers"] = obj.pop("aliases")
+    return BasisSetData.parse_obj(obj)
