@@ -1,4 +1,5 @@
 import pytest
+from aiida.common.exceptions import NotExistent, ValidationError
 from aiida.plugins import DataFactory
 
 from . import TEST_DIR
@@ -40,7 +41,7 @@ def test_n_orbital_functions():
 
 
 def test_get():
-    from aiida.common.exceptions import NotExistent, MultipleObjectsError
+    from aiida.common.exceptions import MultipleObjectsError, NotExistent
 
     BasisSet = DataFactory("gaussian.basisset")
 
@@ -60,3 +61,29 @@ def test_get():
     # leaving away the name should return multiple ones, raising an error
     with pytest.raises(MultipleObjectsError):
         BasisSet.get(element="H")
+
+
+def test_validation_empty():
+    BasisSet = DataFactory("gaussian.basisset")
+    bset = BasisSet()
+
+    with pytest.raises(ValidationError):
+        bset.store()
+
+
+def test_validation_no_l_tuple():
+    BasisSet = DataFactory("gaussian.basisset")
+    bset = BasisSet(name="test", element="H", blocks=[{"n": 1, "l": [(1, 2, 3)]}])
+
+    with pytest.raises(ValidationError):
+        bset.store()
+
+
+def test_get_matching_empty():
+    BasisSet = DataFactory("gaussian.basisset")
+
+    with open(TEST_DIR.joinpath("BASIS_MOLOPT.H"), "r") as fhandle:
+        bsets = BasisSet.from_cp2k(fhandle)
+
+    with pytest.raises(NotExistent):
+        bsets[0].get_matching_pseudopotential()

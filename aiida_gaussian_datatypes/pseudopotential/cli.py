@@ -10,13 +10,15 @@ import sys
 
 import click
 import tabulate
-
 from aiida.cmdline.commands.cmd_data import verdi_data
-from aiida.cmdline.utils import decorators, echo
 from aiida.cmdline.params import arguments, options
 from aiida.cmdline.params.types import DataParamType, GroupParamType
+from aiida.cmdline.utils import decorators, echo
 
 from ..utils import click_parse_range  # pylint: disable=relative-beyond-top-level
+
+if not hasattr(echo, "echo_report"):  # monkeypatch the new echo_report in old versions of aiida
+    echo.echo_report = echo.echo_info
 
 
 def _names_column(name, aliases):
@@ -32,12 +34,12 @@ def _formatted_table_import(pseudos):
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
-            ", ".join(f"{n}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
+            ", ".join(f"{n:2d}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
             pseudo.version,
         )
 
     table_content = [row(n, p) for n, p in enumerate(pseudos)]
-    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, d)", "Version"])
+    return tabulate.tabulate(table_content, headers=["Nr.", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 def _formatted_table_list(pseudos):
@@ -49,12 +51,12 @@ def _formatted_table_list(pseudos):
             pseudo.element,
             _names_column(pseudo.name, pseudo.aliases),
             ", ".join(pseudo.tags),
-            ", ".join(f"{n}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
+            ", ".join(f"{n:2d}" for n in pseudo.n_el + (3 - len(pseudo.n_el)) * [0]),
             pseudo.version,
         )
 
     table_content = [row(p) for p in pseudos]
-    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, d)", "Version"])
+    return tabulate.tabulate(table_content, headers=["ID", "Sym", "Names", "Tags", "Val. e⁻ (s, p, ..)", "Version"])
 
 
 @verdi_data.group("gaussian.pseudo")
@@ -105,7 +107,7 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_i
     pseudos = loaders[fformat](pseudopotential_file, filters, duplicates, ignore_invalid)
 
     if not pseudos:
-        echo.echo_info("No valid Gaussian Pseudopotentials found in the given file matching the given criteria")
+        echo.echo_report("No valid Gaussian Pseudopotentials found in the given file matching the given criteria")
         return
 
     if len(pseudos) == 1:
@@ -114,7 +116,7 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_i
         pseudo.store()
 
     else:
-        echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
+        echo.echo_report("{} Gaussian Pseudopotentials found:\n".format(len(pseudos)))
         echo.echo(_formatted_table_import(pseudos))
         echo.echo("")
 
@@ -124,13 +126,13 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_i
             value_proc=lambda v: click_parse_range(v, len(pseudos)))
 
         for idx in indexes:
-            echo.echo_info(
+            echo.echo_report(
                 "Adding Gaussian Pseudopotentials for: {p.element} ({p.name})... ".format(p=pseudos[idx]), nl=False)
             pseudos[idx].store()
             echo.echo("DONE")
 
     if group:
-        echo.echo_info(f"The created Gaussian Pseudopotential nodes were added to group '{group.label}'")
+        echo.echo_report(f"The created Gaussian Pseudopotential nodes were added to group '{group.label}'")
         group.store()
         group.add_nodes(pseudos)
 
@@ -145,8 +147,9 @@ def list_pseudo(sym, name, tags):
     """
     List Gaussian Pseudopotentials
     """
-    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
 
     query = QueryBuilder()
     query.append(Pseudopotential)
@@ -164,7 +167,7 @@ def list_pseudo(sym, name, tags):
         echo.echo("No Gaussian Pseudopotentials found.")
         return
 
-    echo.echo_info("{} Gaussian Pseudopotentials found:\n".format(query.count()))
+    echo.echo_report("{} Gaussian Pseudopotentials found:\n".format(query.count()))
     echo.echo(_formatted_table_list(pseudo for [pseudo] in query.iterall()))
     echo.echo("")
 
@@ -187,8 +190,9 @@ def dump_pseudo(sym, name, tags, output_format, data):
     Print specified Pseudopotentials
     """
 
-    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
     from aiida.orm.querybuilder import QueryBuilder
+
+    from aiida_gaussian_datatypes.pseudopotential.data import Pseudopotential
 
     writers = {
         "cp2k": Pseudopotential.to_cp2k,
@@ -219,6 +223,6 @@ def dump_pseudo(sym, name, tags, output_format, data):
 
     for pseudo in data:
         if echo.is_stdout_redirected():
-            echo.echo_info("Dumping {}/{} ({})...".format(pseudo.name, pseudo.element, pseudo.uuid), err=True)
+            echo.echo_report("Dumping {}/{} ({})...".format(pseudo.name, pseudo.element, pseudo.uuid), err=True)
 
         writers[output_format](pseudo, sys.stdout)

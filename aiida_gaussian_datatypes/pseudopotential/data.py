@@ -6,9 +6,17 @@
 Gaussian Pseudopotential Data class
 """
 
-from aiida.orm import Data, Group
+from decimal import Decimal
+from typing import Any, Dict
 
-from .utils import write_cp2k_pseudo, cp2k_pseudo_file_iter
+from aiida.common.exceptions import (
+    MultipleObjectsError,
+    NotExistent,
+    UniquenessError,
+    ValidationError,
+)
+from aiida.orm import Data, Group
+from cp2k_input_tools.pseudopotentials import PseudopotentialData
 
 
 class Pseudopotential(Data):
@@ -26,6 +34,7 @@ class Pseudopotential(Data):
         n_el=None,
         local=None,
         non_local=None,
+        nlcc=None,
         version=1,
         **kwargs,
     ):
@@ -51,27 +60,22 @@ class Pseudopotential(Data):
         if not non_local:
             non_local = []
 
+        if not nlcc:
+            nlcc = []
+
         if "label" not in kwargs:
             kwargs["label"] = name
 
-        super(Pseudopotential, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
-        self.set_attribute("name", name)
-        self.set_attribute("element", element)
-        self.set_attribute("tags", tags)
-        self.set_attribute("aliases", aliases)
-        self.set_attribute("n_el", n_el)
-        self.set_attribute("local", local)
-        self.set_attribute("non_local", non_local)
-        self.set_attribute("version", version)
+        for attr in ("name", "element", "tags", "aliases", "n_el", "local", "non_local", "nlcc", "version"):
+            self.set_attribute(attr, locals()[attr])
 
     def store(self, *args, **kwargs):
         """
         Store the node, ensuring that the combination (element,name,version) is unique.
         """
         # TODO: this uniqueness check is not race-condition free.
-
-        from aiida.common.exceptions import UniquenessError, NotExistent
 
         try:
             existing = self.get(self.element, self.name, self.version, match_aliases=False)
@@ -83,42 +87,25 @@ class Pseudopotential(Data):
                 f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
             )
 
-        return super(Pseudopotential, self).store(*args, **kwargs)
+        return super().store(*args, **kwargs)
 
     def _validate(self):
-        super(Pseudopotential, self)._validate()
-
-        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA
-        from aiida.common.exceptions import ValidationError
-
-        # fmt: off
-        schema = Schema({
-            'name': str,
-            'element': str,
-            'tags': [str],
-            'aliases': [str],
-            'n_el': [int],
-            'local': {
-                'r': float,
-                'coeffs': [float],
-                },
-            'non_local': [{
-                'r': float,
-                'nproj': int,
-                'coeffs': [float],
-                }],
-            'version': int,
-            }, extra=ALLOW_EXTRA, required=True)
-        # fmt: on
+        super()._validate()
 
         try:
-            schema(self.attributes)
-        except MultipleInvalid as exc:
-            raise ValidationError(str(exc))
+            # directly raises a ValidationError for the pseudo data if something's amiss
+            _dict2pseudodata(self.attributes)
 
-        for nlocal in self.attributes["non_local"]:
-            if len(nlocal["coeffs"]) != nlocal["nproj"] * (nlocal["nproj"] + 1) // 2:
-                raise ValidationError("invalid number of coefficients for non-local projection")
+            assert isinstance(self.name, str) and self.name
+            assert (
+                isinstance(self.aliases, list)
+                and all(isinstance(alias, str) for alias in self.aliases)
+                and self.aliases
+            )
+            assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
+            assert isinstance(self.version, int) and self.version > 0
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
 
     @property
     def element(self):
@@ -199,7 +186,7 @@ class Pseudopotential(Data):
 
             {
                 'r': float,
-                'nprj': int,
+                'nproj': int,
                 'coeffs': [float, float, ...],  # only the upper-triangular elements
             }
 
@@ -207,8 +194,17 @@ class Pseudopotential(Data):
         """
         return self.get_attribute("non_local", [])
 
+    @property
+    def nlcc(self):
+        """
+        Return a list of the non-local core-corrections data
+
+        :rtype:list
+        """
+        return self.get_attribute("nlcc", [])
+
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
         """
         Get the first matching Pseudopotential for the given parameters.
 
@@ -218,7 +214,6 @@ class Pseudopotential(Data):
         :param match_aliases: Whether to look in the list of of aliases for a matching name
         """
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -247,7 +242,12 @@ class Pseudopotential(Data):
         # query.order_by({Pseudopotential: [{"attributes.version": {"cast": "i", "order": "desc"}}]})
         # items = query.first()
 
-        items = sorted(query.iterall(), key=lambda p: p[0].version, reverse=True)
+        all_iter = query.iterall()
+
+        if n_el:
+            all_iter = filter(lambda p: sum(p[0].n_el) == n_el, all_iter)
+
+        items = sorted(all_iter, key=lambda p: p[0].version, reverse=True)
 
         if not items:
             raise NotExistent(
@@ -273,8 +273,7 @@ class Pseudopotential(Data):
         :param ignore_invalid: whether to ignore invalid entries silently
         :rtype: list
         """
-
-        from aiida.common.exceptions import UniquenessError, NotExistent
+        from cp2k_input_tools.pseudopotentials import PseudopotentialData
 
         if not filters:
             filters = {}
@@ -290,7 +289,13 @@ class Pseudopotential(Data):
 
             return True
 
-        pseudos = [p for p in cp2k_pseudo_file_iter(fhandle, ignore_invalid) if matches_criteria(p)]
+        pseudos = [
+            p
+            for p in (
+                _pseudodata2dict(p) for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
+            )
+            if matches_criteria(p)
+        ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             pseudos = [p for p in pseudos if not exists(p)]
@@ -327,12 +332,56 @@ class Pseudopotential(Data):
 
         :param fhandle: open file handle
         """
-        write_cp2k_pseudo(
-            fhandle,
-            self.element,
-            self.name,
-            self.n_el,
-            self.local,
-            self.non_local,
-            comment=f"from AiiDA Pseudopotential<uuid: {self.uuid}>",
-        )
+
+        fhandle.write(f"# from AiiDA Pseudopotential<uuid: {self.uuid}>\n")
+        for line in _dict2pseudodata(self.attributes).cp2k_format_line_iter():
+            fhandle.write(line)
+            fhandle.write("\n")
+
+    def get_matching_basisset(self, *args, **kwargs):
+        """
+        Get a pseudopotential matching this basis set by at least element and number of valence electrons.
+        Additional arguments are passed on to BasisSet.get()
+        """
+        from ..basisset.data import BasisSet
+
+        if self.n_el:
+            return BasisSet.get(element=self.element, n_el=sum(self.n_el), *args, **kwargs)
+        else:
+            return BasisSet.get(element=self.element, *args, **kwargs)
+
+
+def _pseudodata2dict(data: PseudopotentialData) -> Dict[str, Any]:
+    """
+    Convert a PseudopotentialData to a compatible dict with:
+    * Decimals replaced by strings
+    * the required attrs set on the root
+    * the key "coefficients" replaced with "coeffs"
+    """
+
+    pseudo_dict = data.dict(by_alias=True)
+
+    stack = [pseudo_dict]
+    while stack:
+        current = stack.pop()
+        for key, val in current.items():
+            if isinstance(val, dict):
+                stack.append(val)
+            elif isinstance(val, Decimal):
+                current[key] = str(val)
+            elif isinstance(val, list) and val and isinstance(val[0], dict):
+                stack += val
+            elif isinstance(val, list) and val and isinstance(val[0], Decimal):
+                current[key] = [str(v) for v in val]
+
+    pseudo_dict["aliases"] = sorted(pseudo_dict.pop("identifiers"), key=lambda i: -len(i))
+    pseudo_dict["name"] = pseudo_dict["aliases"][0]
+    pseudo_dict["tags"] = pseudo_dict["name"].split("-")
+
+    return pseudo_dict
+
+
+def _dict2pseudodata(data: Dict[str, Any]) -> PseudopotentialData:
+    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version")}
+    obj["identifiers"] = obj.pop("aliases")
+    return PseudopotentialData.parse_obj(obj)

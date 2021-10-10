@@ -26,3 +26,7 @@ exclude = '''
                      # the root of the project
 )
 '''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3

@@ -14,6 +14,7 @@
 import os
 import sys
 import time
+
 import aiida_gaussian_datatypes
 
 # -- AiiDA-related setup --------------------------------------------------

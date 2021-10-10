@@ -6,9 +6,17 @@
 Gaussian Basis Set Data Class
 """
 
-from aiida.orm import Data, Group
+from decimal import Decimal
+from typing import Any, Dict
 
-from .utils import write_cp2k_basisset, cp2k_basisset_file_iter
+from aiida.common.exceptions import (
+    MultipleObjectsError,
+    NotExistent,
+    UniquenessError,
+    ValidationError,
+)
+from aiida.orm import Data, Group
+from cp2k_input_tools.basissets import BasisSetData
 
 
 class BasisSet(Data):
@@ -54,8 +62,6 @@ class BasisSet(Data):
         """
         # TODO: this uniqueness check is not race-condition free.
 
-        from aiida.common.exceptions import UniquenessError, NotExistent
-
         try:
             existing = self.get(self.element, self.name, self.version, match_aliases=False)
         except NotExistent:
@@ -71,29 +77,20 @@ class BasisSet(Data):
     def _validate(self):
         super(BasisSet, self)._validate()
 
-        from voluptuous import Schema, MultipleInvalid, ALLOW_EXTRA, All, Any, Length
-        from aiida.common.exceptions import ValidationError
-
-        # fmt: off
-        schema = Schema({
-            'name': str,
-            'element': str,
-            'tags': [str],
-            'aliases': [str],
-            'n_el': Any(int, None),
-            'blocks': [{
-                "n": int,
-                "l": [All([int], Length(2, 2)), All((int,), Length(2, 2))],
-                "coefficients": [[float]],
-                }],
-            'version': int,
-            }, extra=ALLOW_EXTRA, required=True)
-        # fmt: on
-
         try:
-            schema(self.attributes)
-        except MultipleInvalid as exc:
-            raise ValidationError(str(exc))
+            # directly raises an exception for the data if something's amiss, extra fields are ignored
+            _dict2basissetdata(self.attributes)
+
+            assert isinstance(self.name, str) and self.name
+            assert (
+                isinstance(self.aliases, list)
+                and all(isinstance(alias, str) for alias in self.aliases)
+                and self.aliases
+            )
+            assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
+            assert isinstance(self.version, int) and self.version > 0
+        except Exception as exc:
+            raise ValidationError("One or more invalid fields found") from exc
 
     @property
     def element(self):
@@ -191,9 +188,8 @@ class BasisSet(Data):
         return norbfuncs
 
     @classmethod
-    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None):
+    def get(cls, element, name=None, version="latest", match_aliases=True, group_label=None, n_el=None):
         from aiida.orm.querybuilder import QueryBuilder
-        from aiida.common.exceptions import NotExistent, MultipleObjectsError
 
         query = QueryBuilder()
 
@@ -215,6 +211,9 @@ class BasisSet(Data):
                 filters["attributes.aliases"] = {"contains": [name]}
             else:
                 filters["attributes.name"] = {"==": name}
+
+        if n_el:
+            filters["attributes.n_el"] = {"==": n_el}
 
         query.add_filter(BasisSet, filters)
 
@@ -245,9 +244,6 @@ class BasisSet(Data):
         :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
         :rtype: list
         """
-
-        from aiida.common.exceptions import UniquenessError, NotExistent
-
         if not filters:
             filters = {}
 
@@ -262,7 +258,9 @@ class BasisSet(Data):
 
             return True
 
-        bsets = [bs for bs in cp2k_basisset_file_iter(fhandle) if matches_criteria(bs)]
+        bsets = [
+            bs for bs in (_basissetdata2dict(bs) for bs in BasisSetData.datafile_iter(fhandle)) if matches_criteria(bs)
+        ]
 
         if duplicate_handling == "ignore":  # simply filter duplicates
             bsets = [bs for bs in bsets if not exists(bs)]
@@ -299,7 +297,56 @@ class BasisSet(Data):
 
         :param fhandle: A valid output file handle
         """
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for line in _dict2basissetdata(self.attributes).cp2k_format_line_iter():
+            fhandle.write(line)
+            fhandle.write("\n")
 
-        return write_cp2k_basisset(
-            fhandle, self.element, self.name, self.blocks, comment=f"from AiiDA BasisSet<uuid: {self.uuid}>"
-        )
+    def get_matching_pseudopotential(self, *args, **kwargs):
+        """
+        Get a pseudopotential matching this basis set by at least element and number of valence electrons.
+        Additional arguments are passed on to Pseudopotential.get()
+        """
+        from ..pseudopotential.data import Pseudopotential
+
+        if self.n_el:
+            return Pseudopotential.get(element=self.element, n_el=self.n_el, *args, **kwargs)
+        else:
+            return Pseudopotential.get(element=self.element, *args, **kwargs)
+
+
+def _basissetdata2dict(data: BasisSetData) -> Dict[str, Any]:
+    """
+    Convert a BasisSetData to a compatible dict with:
+    * Decimals replaced by strings
+    * the required attrs set on the root
+    * the key "coefficients" replaced with "coeffs"
+    """
+
+    bset_dict = data.dict()
+    stack = [bset_dict]
+    while stack:
+        current = stack.pop()
+        for key, val in current.items():
+            if isinstance(val, dict):
+                stack.append(val)
+            elif isinstance(val, Decimal):
+                current[key] = str(val)
+            elif isinstance(val, list) and val and isinstance(val[0], dict):
+                stack += val
+            elif (
+                isinstance(val, list) and val and isinstance(val[0], list) and val[0] and isinstance(val[0][0], Decimal)
+            ):
+                current[key] = [[str(w) for w in v] for v in val]
+
+    bset_dict["aliases"] = sorted(bset_dict.pop("identifiers"), key=lambda i: -len(i))
+    bset_dict["name"] = bset_dict["aliases"][0]
+    bset_dict["tags"] = bset_dict["name"].split("-")
+
+    return bset_dict
+
+
+def _dict2basissetdata(data: BasisSetData) -> Dict[str, Any]:
+    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version")}
+    obj["identifiers"] = obj.pop("aliases")
+    return BasisSetData.parse_obj(obj)
