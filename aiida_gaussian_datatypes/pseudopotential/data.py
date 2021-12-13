@@ -422,6 +422,112 @@ class Pseudopotential(Data):
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [ECPPseudopotential(**data)]
+    @classmethod
+    def from_turborvb(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False, attrs = None, name = None):
+        """
+        Constructs a list with pseudopotential objects from a Pseudopotential in TurboRVB format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
+        :rtype: list
+        """
+
+        if hasattr(fhandle, "name"):
+            import re
+            if re.match("Z[0-9]{1,2}\_atomnumber[0-9]{1,2}\.[A-z]+",
+                        fhandle.name):
+                ret = re.match("Z[0-9]{1,2}\_atomnumber([0-9]{1,2})\.[A-z]+",
+                               fhandle.name)
+                atnum = int(ret.group(1))
+                element = list(SYM2NUM.keys())[list(SYM2NUM.values()).index(atnum)]
+                name = fhandle.name
+
+
+        def exists(pseudo):
+            try:
+                cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        if not attrs:
+            attrs = {}
+
+        """
+        Parser for TurboRVB format
+        """
+
+        functions = []
+        ns = 0
+        for ii, line in enumerate(fhandle):
+            if ii == 0: continue
+            if ii == 1:
+                num, r0, lmax = [float(x) for x in line.split()]
+                continue
+            if ii == 2:
+                numf = [float(x) for x in line.split()]
+                for jj in range(len(numf)):
+                    functions.append({"prefactors" : [],
+                                      "polynoms"   : [],
+                                      "exponents"  : []})
+                continue
+            for jj in range(len(numf)):
+                if numf[jj] < 1: continue
+                numf[jj] -= 1
+                for key, value in zip(("prefactors", "polynoms", "exponents"), map(float, line.split())):
+                    functions[jj][key].append(value)
+
+                functions[jj]["polynoms"] = [ int(x) for x in functions[jj]["polynoms"] ]
+                break
+
+        """
+        TODO properly extract name
+        """
+
+        lmax = int(lmax)
+
+        data = {"functions"      : functions,
+                "element"        : element,
+                "aliases"        : [name],
+                "name"           : name,
+                "core_electrons" : 0,
+                "lmax"           : lmax,
+                "version"        : 1,
+                "n_el"           : None,
+                "n_el_tot"       : 0}
+
+        if "name" in attrs:
+            data["aliases"].append(data["name"])
+            data["name"] = attrs["name"]
+
+        if duplicate_handling == "force-ignore":  # This will be checked at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(data):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(data):
+                raise UniquenessError(
+                    f"Gaussian Pseudopotential already exists for"
+                    f" element={data['element']}, name={data['name']}: {latest.uuid}"
+                )
+
+        elif duplicate_handling == "new":
+            if exists(data):
+                latest = cls.get(data["element"], data["name"], match_aliases=False)
+                data["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        pp = ECPPseudopotential(**data)
+        pp.set_extra("r0", r0)
+        return [pp]
 
     def to_cp2k(self, fhandle):
         """
@@ -473,8 +579,11 @@ class Pseudopotential(Data):
         """
 
         if isinstance(self, ECPPseudopotential):
-            fhandle.write(f"GEN\n")
-            fhandle.write(f"1 0 {self.lmax}\n")
+            fhandle.write(f"ECP\n")
+            r0 = 0.0
+            if "r0" in self.extras:
+                r0 = self.extras["r0"]
+            fhandle.write(f"1 {r0:4.2f} {len(self.functions)}\n")
             fhandle.write(" ".join([ f"{len(x['polynoms'])}" for x in self.functions ]))
             fhandle.write("\n")
             for fun in self.functions:

@@ -75,7 +75,7 @@ def cli():
     help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option(
     'fformat', '-f', '--format',
-    type=click.Choice(['cp2k', 'gamess' ]), default='cp2k',
+    type=click.Choice(['cp2k', 'gamess', 'turborvb' ]), default='cp2k',
     help="the format of the pseudopotential file")
 @click.option(
     '--duplicates',
@@ -99,6 +99,7 @@ def import_pseudo(pseudopotential_file, fformat, sym, tags, duplicates, ignore_i
     loaders = {
         "cp2k": Pseudopotential.from_cp2k,
         "gamess": Pseudopotential.from_gamess,
+        "turborvb": Pseudopotential.from_turborvb,
     }
 
     filters = {

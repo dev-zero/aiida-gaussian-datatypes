@@ -69,7 +69,7 @@ class BasisSetCommon(Data):
 
         try:
             # directly raises an exception for the data if something's amiss, extra fields are ignored
-            BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
+            # BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
 
             #assert isinstance(self.name, str) and self.name
             assert (
@@ -474,6 +474,32 @@ class BasisSetCommon(Data):
     def to_gamess(self, fhandle):
         """
         Write the Basis Set to the passed file handle in the format expected by GAMESS.
+
+        :param fhandle: A valid output file handle
+        """
+        orb_dict = {0 : "s",
+                    1 : "p",
+                    2 : "d",
+                    3 : "f",
+                    4 : "g",
+                    5 : "h",
+                    6 : "i" }
+
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for block in self.blocks:
+            offset = 0
+            for orb, num, in block["l"]:
+                fhandle.write(f" {orb_dict[orb].upper()}  {len(block['coefficients'])}\n")
+                for lnum in range(num):
+                    for ii, entry in enumerate(block["coefficients"]):
+                        exponent = entry[0]
+                        coefficient = entry[1 + lnum + offset]
+                        fhandle.write(f"  {ii + 1:3d} {exponent:15.7f} {coefficient:15.7f}\n")
+                offset = num
+
+    def to_gaussian(self, fhandle):
+        """
+        Write the Basis Set to the passed file handle in the format expected by Gaussian.
 
         :param fhandle: A valid output file handle
         """
