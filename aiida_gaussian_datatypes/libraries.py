@@ -137,3 +137,25 @@ class QmcpackLibrary(_ExternalLibrary):
 
         return elements
 
+@LibraryBookKeeper.register_library
+class BFDLibrary(_ExternalLibrary):
+
+    _URL = "http://burkatzki.com/pseudos/step4.2.php?format=gaussian&element={e}&basis={b}"
+
+    @classmethod
+    def fetch(cls):
+
+        from ase.data import chemical_symbols
+        from ase.data import atomic_numbers
+        from time import sleep
+
+        list_of_basis  =[ f"v{s}z" for s in "dtq56" ]
+        list_of_basis += [ f"{x}_ano" for x in list_of_basis ]
+
+        for b in list_of_basis:
+            for ie in range(1, 87):
+                l = cls._URL.format(b = b, e = chemical_symbols[ie])
+                to_file(urlopen(l).read(), ie, b)
+                """ Cool down """
+                sleep(0.5)
+
