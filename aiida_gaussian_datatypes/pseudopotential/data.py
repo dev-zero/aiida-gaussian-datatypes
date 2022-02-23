@@ -10,6 +10,7 @@ import dataclasses
 from ..utils import SYM2NUM
 from decimal import Decimal
 from icecream import ic
+import numpy as np
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -529,7 +530,7 @@ class Pseudopotential(Data):
         pp.set_extra("r0", r0)
         return [pp]
 
-    def to_cp2k(self, fhandle):
+    def to_cp2k(self, fhandle, **kwargs):
         """
         Write this Pseudopotential instance to a file in CP2K format.
 
@@ -549,7 +550,7 @@ class Pseudopotential(Data):
             """
             pass
 
-    def to_gamess(self, fhandle):
+    def to_gamess(self, fhandle, **kwargs):
         """
         Write this Pseudopotential instance to a file in Gamess format.
 
@@ -571,18 +572,43 @@ class Pseudopotential(Data):
             """
             pass
 
-    def to_turborvb(self, fhandle):
+    def to_turborvb(self, fhandle, tolerance = 1.0e-5):
         """
         Write this Pseudopotential instance to a file in TurboRVB format.
 
         :param fhandle: open file handle
+        :param tolerance: tolerance for pseudopotential
         """
+        def f(r, block):
+            nmax = len(block)
+            psip = np.zeros(nmax)
+            fun = 0.0
+            if r < 1.0e-9: r = 1.0e-9
+
+            for i in range(nmax):
+                psip[i] = np.exp(-block[i][2]*r*r + np.log(r)*block[i][1])
+
+            for i in range(nmax):
+                fun += psip[i] * block[i][0]
+
+            return fun/r/r
 
         if isinstance(self, ECPPseudopotential):
             fhandle.write(f"ECP\n")
             r0 = 0.0
             if "r0" in self.extras:
                 r0 = self.extras["r0"]
+            r0s = []
+            for fun in self.functions:
+                X = [ ii for ii in np.arange(0,10,0.01) ]
+                block = [ [prefactor, polynom, exponent] for prefactor, polynom, exponent in zip(*[ fun[k] for k in ("prefactors", "polynoms", "exponents")])]
+                Y = [ f(x, block) for x in X ]
+                for ii in reversed(range(len(X))):
+                    if Y[ii] > tolerance:
+                        r0s.append(X[ii])
+                        break
+            r0 = max(r0s)
+
             fhandle.write(f"1 {r0:4.2f} {len(self.functions)}\n")
             fhandle.write(" ".join([ f"{len(x['polynoms'])}" for x in self.functions ]))
             fhandle.write("\n")
