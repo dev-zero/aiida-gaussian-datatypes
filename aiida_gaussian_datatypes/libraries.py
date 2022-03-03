@@ -4,6 +4,7 @@
 # Was there really a fish
 # That grants you that kind of wish
 #
+
 import os
 import re
 import git
@@ -147,7 +148,60 @@ class BFDLibrary(_ExternalLibrary):
 
         from ase.data import chemical_symbols
         from ase.data import atomic_numbers
+        from urllib.request import urlopen
         from time import sleep
+        import io
+
+        elements = {}
+        def add_data(source, e, b):
+
+            source = str(source)
+            pat=re.compile("^.*?(" + e + "\s0.*$)",re.M|re.DOTALL)
+            x = pat.sub("\g<1>", source)
+            x = re.sub("\<br\s*/\>", "\n", x)
+            x = re.sub("\&nbsp", "", x)
+            x = re.sub("\&nbsp", "", x)
+            x = re.sub(".*html.*$", "", x)
+            pat=re.compile("^.*?(" + e + "\s0.*)("+e+" 0.*)$",re.M|re.DOTALL)
+            m = pat.match(x)
+            if(m):
+                bas = m.group(1)
+                ecp = m.group(2)
+                if len(bas) < 15: return
+                typ = "BFD"
+                pseudo, = Pseudopotential.from_gaussian(io.StringIO(ecp),
+                                                        duplicate_handling = "force-ignore",
+                                                        attrs = {"name" : f"{typ}" })
+
+                basisset, = BasisSet.from_gaussian(io.StringIO(f"\n{bas}"),
+                                                   duplicate_handling = "force-ignore",
+                                                   attrs = {"name" : f"{typ}-{b}" })
+                pseudos = [{"path": "",
+                            "obj": pseudo}]
+                version = 1
+                pseudo.attributes["version"] = version
+
+                tags = []
+                tags.append(f"q{pseudo.n_el_tot}")
+                tags.append(f"c{pseudo.core_electrons}")
+                pseudo.tags.extend(tags)
+
+                if e not in elements:
+                    elements[e] = {"path": "",
+                                   "types": {}}
+
+                if typ not in elements[e]["types"]:
+                    elements[e]["types"][typ] = {"path": "",
+                                                 "basis": [],
+                                                 "pseudos": pseudos,
+                                                 "tags": []}
+                elements[e]["types"][typ]["tags"].extend(tags)
+                elements[e]["types"][typ]["basis"].append({"path" : f"http://burkatzki.com|{b}",
+                                                           "obj"  : basisset})
+                elements[e]["types"][typ]["tags"].append("BFD")
+                tt = set(elements[e]["types"][typ]["tags"])
+                elements[e]["types"][typ]["tags"] = list(tt)
+
 
         list_of_basis  =[ f"v{s}z" for s in "dtq56" ]
         list_of_basis += [ f"{x}_ano" for x in list_of_basis ]
@@ -155,7 +209,8 @@ class BFDLibrary(_ExternalLibrary):
         for b in list_of_basis:
             for ie in range(1, 87):
                 l = cls._URL.format(b = b, e = chemical_symbols[ie])
-                to_file(urlopen(l).read(), ie, b)
+                add_data(urlopen(l).read(), chemical_symbols[ie], b)
                 """ Cool down """
                 sleep(0.5)
 
+        return elements

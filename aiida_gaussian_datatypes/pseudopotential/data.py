@@ -320,6 +320,108 @@ class Pseudopotential(Data):
         return [GTHPseudopotential(**p) for p in pseudos]
 
     @classmethod
+    def from_gaussian(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False, attrs = None):
+        """
+        Constructs a list with pseudopotential objects from a Pseudopotential in Gaussian format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :param ignore_invalid: whether to ignore invalid entries silently
+        :rtype: list
+        """
+
+        def exists(pseudo):
+            try:
+                cls.get(pseudo["element"], pseudo["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        if not attrs:
+            attrs = {}
+
+        """
+        Parser for Gaussian format
+        """
+
+        was_comment_line = 0
+        functions = []
+        for ii, line in enumerate(fhandle):
+            if len(line.strip()) == 0: continue
+            if ii == 0:
+                element, n, = line.split()
+                continue
+            if ii == 1:
+                qmc, n, core_electrons, = line.split()
+                continue
+            if was_comment_line == -1:
+                was_comment_line = int(line.strip())
+            if was_comment_line == 0:
+                functions.append({"prefactors" : [],
+                                  "polynoms"   : [],
+                                  "exponents"  : []})
+            else:
+                was_comment_line -= 1
+                functions[-1]["exponents"].append(int(line.strip()[0]))
+                functions[-1]["polynoms"].append(float(line.strip()[1]))
+                functions[-1]["prefactors"].append(float(line.strip()[2]))
+
+        """
+        Change the order of functions so they match orbital momentum
+
+        In Gaussian format first block represents upper most lmax
+        and then the rest s, p, d, ...
+        """
+        functions = functions[1:] + [functions[0]]
+
+        """
+        TODO properly extract name
+        """
+
+        lmax = len(functions) - 1
+        core_electrons = int(core_electrons)
+
+        data = {"functions"      : functions,
+                "element"        : element,
+                "aliases"        : [qmc],
+                "name"           : qmc,
+                "core_electrons" : core_electrons,
+                "lmax"           : lmax,
+                "version"        : 1,
+                "n_el"           : None,
+                "n_el_tot"       : SYM2NUM[element] - core_electrons}
+
+        if "name" in attrs:
+            data["aliases"].append(data["name"])
+            data["name"] = attrs["name"]
+
+        if duplicate_handling == "force-ignore":  # This will be checked at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(data):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(data):
+                raise UniquenessError(
+                    f"Gaussian Pseudopotential already exists for"
+                    f" element={data['element']}, name={data['name']}: {latest.uuid}"
+                )
+
+        elif duplicate_handling == "new":
+            if exists(data):
+                latest = cls.get(data["element"], data["name"], match_aliases=False)
+                data["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return [ECPPseudopotential(**data)]
+
+    @classmethod
     def from_gamess(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False, attrs = None):
         """
         Constructs a list with pseudopotential objects from a Pseudopotential in GAMESS format
@@ -422,6 +524,7 @@ class Pseudopotential(Data):
             raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
 
         return [ECPPseudopotential(**data)]
+
     @classmethod
     def from_turborvb(cls, fhandle, filters=None, duplicate_handling="ignore", ignore_invalid=False, attrs = None, name = None):
         """
