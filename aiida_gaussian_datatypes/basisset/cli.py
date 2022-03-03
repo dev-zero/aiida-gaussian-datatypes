@@ -91,6 +91,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
     loaders = {
         "cp2k": BasisSet.from_cp2k,
         "nwchem": BasisSet.from_nwchem,
+        "gaussian": BasisSet.from_gaussian,
     }
 
     filters = {

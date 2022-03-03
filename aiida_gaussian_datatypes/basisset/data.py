@@ -314,6 +314,121 @@ class BasisSetCommon(Data):
         return [cls(**bs) for bs in bsets]
 
     @classmethod
+    def from_gaussian(cls, fhandle, filters=None, duplicate_handling="ignore", attrs = None):
+        """
+        Constructs a list with basis set objects from a Basis Set in Gaussian format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
+        """
+
+        def exists(bset):
+            try:
+                cls.get(bset["element"], bset["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        """
+        Gaussian parser
+
+        TODO Maybe parser should move to "parsers"
+        """
+
+        element = None
+        data = []
+        blocks = []
+
+        if not attrs:
+            attrs = {}
+
+        def block_creator(b, orb, blocks = blocks):
+            orb_dict = {"s" : 0,
+                        "p" : 1,
+                        "d" : 2,
+                        "f" : 3,
+                        "g" : 4,
+                        "h" : 5,
+                        "i" : 6 }
+            block = { "n": 0, # I dont know how to setup main quantum number
+                      "l": [(orb_dict[orb], 1)],
+                      "coefficients" : [ [ d["exp"], d["cont"] ] for d in b ] }
+            blocks.append(block)
+
+        orb = "x"
+        for ii, line in enumerate(fhandle):
+            if ii == 1:
+                element = line.lower().split()[0]
+                continue
+            if re.match("^[A-z ]+[0-9\. ]*$", line):
+                if len(data) != 0:
+                    block_creator(data, orb)
+                data = []
+                orb = line.lower().split()[0]
+            if re.match("^[+-.0-9 ]+$", line):
+                exp, cont, = [ float(x) for x in line.split() ]
+                data.append({"exp" : exp,
+                             "cont" : cont })
+        if len(data) != 0:
+            block_creator(data, orb)
+            data = []
+
+        try:
+            basis = {"element" : element.capitalize(),
+                     "version" : 1,
+                     "name" : "unknown",
+                     "tags" : [],
+                     "aliases" : [],
+                     "blocks" : blocks }
+        except:
+            return []
+
+        basis["name"] = "NA"
+
+        if hasattr(fhandle, "name"):
+            basis["name"] = Path(fhandle.name).name.replace(".nwchem", "")
+            basis["aliases"].append(basis["name"].split(".")[-1])
+
+        if "name" in attrs:
+            basis["aliases"].append(basis["name"])
+            basis["name"] = attrs["name"]
+
+        for attr in ("n_el", "tags",):
+            if attr in attrs:
+                basis[attr] = attrs[attr]
+
+        if len(basis["aliases"]) == 0:
+            del basis["aliases"]
+
+        if duplicate_handling == "force-ignore":  # It will check at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(basis):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(basis):
+                raise UniquenessError( f"Gaussian Basis Set already exists for"
+                                       f" element={basis['element']}, name={basis['name']}: {latest.uuid}")
+
+        elif duplicate_handling == "new":
+                try:
+                    latest = cls.get(basis["element"], basis["name"], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    basis["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return [cls(**basis)]
+
+    @classmethod
     def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", attrs = None):
         """
         Constructs a list with basis set objects from a Basis Set in NWCHEM format
@@ -366,7 +481,7 @@ class BasisSetCommon(Data):
                 if len(data) != 0:
                     block_creator(data, orb)
                     data = []
-                el, orb, = line.lower().split()
+                el, orb = line.lower().split()
                 if element is None:
                     """
                     TODO check validity of element

@@ -69,13 +69,21 @@ def _formatted_table_import(elements):
                 p = ""
                 tags = []
 
+            name = ""
+            m = re.match("http:\/\/burkatzki\.com\|([A-z]+)", b)
+            if m:
+                name = m.group(1)
+            m = re.match("[A-z]{1,2}\.(.+).nwchem", b)
+            if m:
+                name = m.group(1)
+
             return (
                 num,
                 element,
                 t,
                 p,
-                " ".join(tags),
-                re.match("[A-z]{1,2}\.(.+).nwchem", b).group(1),
+                " ".join(sorted(tags)),
+                name,
                 b
             )
 
@@ -86,9 +94,14 @@ def _formatted_table_import(elements):
                 continue
             p = d["types"][t]["pseudos"][0]
             for b in d["types"][t]["basis"]:
-                table_content.append(row(ii, e, t, p["path"].name,
+                name = ""
+                if isinstance(b["path"], str):
+                    name = b["path"]
+                if hasattr(b["path"], "name"):
+                    name = b["path"].name
+                table_content.append(row(ii, e, t, name,
                                          d["types"][t]["tags"],
-                                         b["path"].name))
+                                         name))
 
     #table_content = [row(n, p, v) for n, (p, v) in enumerate(elements.items())]
     return tabulate.tabulate(table_content, headers=["Nr.", "Element", "Type", "PseudoFile", "Tags", "Basis", "BasisFile"])
