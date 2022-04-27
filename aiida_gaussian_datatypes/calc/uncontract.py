@@ -2,7 +2,6 @@
 
 from aiida.plugins import DataFactory
 from aiida.engine import calcfunction
-from icecream import ic
 """
 
 """
