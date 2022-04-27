@@ -188,7 +188,7 @@ def list_pseudo(sym, name, tags):
                                                                     'gamess',
                                                                     'turborvb']), default='cp2k',
               help="Chose the output format for the pseudopotentials: " + ', '.join(['cp2k', ]))
-@click.option('-t', '--tolerance', type=str, default=1.0e-5,
+@click.option('-r', '--tolerance', type=float, default=1.0e-5,
               help="set tolerance value for pseudo cutoff (default 1.0e-5, only for turborvb format)")
 @decorators.with_dbenv()
 # fmt: on

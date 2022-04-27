@@ -347,22 +347,23 @@ class Pseudopotential(Data):
         Parser for Gaussian format
         """
 
-        was_comment_line = 0
+        was_comment_line = 2
         functions = []
+        functions.append({"prefactors" : [],
+                          "polynoms"   : [],
+                          "exponents"  : []})
         for ii, line in enumerate(fhandle):
-            if len(line.strip()) == 0: continue
+            ic(line.strip())
             if ii == 0:
                 element, n, = line.split()
                 continue
             if ii == 1:
                 qmc, n, core_electrons, = line.split()
                 continue
+            if ii == 2:
+                continue
             if was_comment_line == -1:
                 was_comment_line = int(line.strip())
-            if was_comment_line == 0:
-                functions.append({"prefactors" : [],
-                                  "polynoms"   : [],
-                                  "exponents"  : []})
             else:
                 was_comment_line -= 1
                 functions[-1]["exponents"].append(int(line.strip()[0]))
@@ -675,7 +676,7 @@ class Pseudopotential(Data):
             """
             pass
 
-    def to_turborvb(self, fhandle, tolerance = 1.0e-5):
+    def to_turborvb(self, fhandle, tolerance = 1.0e-5, index = 1, **kwargs):
         """
         Write this Pseudopotential instance to a file in TurboRVB format.
 
@@ -712,7 +713,7 @@ class Pseudopotential(Data):
                         break
             r0 = max(r0s)
 
-            fhandle.write(f"1 {r0:4.2f} {len(self.functions)}\n")
+            fhandle.write(f"{index} {r0:4.2f} {len(self.functions)}\n")
             fhandle.write(" ".join([ f"{len(x['polynoms'])}" for x in self.functions ]))
             fhandle.write("\n")
             for fun in self.functions:
