@@ -13,7 +13,6 @@ import pathlib
 import pydriller
 from aiida_gaussian_datatypes import utils
 from typing import Dict, Generic, List, Optional, Sequence, Type, TypeVar
-from icecream import ic
 from .basisset.data import BasisSet
 from .pseudopotential.data import Pseudopotential, ECPPseudopotential
 
@@ -173,9 +172,14 @@ class BFDLibrary(_ExternalLibrary):
                                                         duplicate_handling = "force-ignore",
                                                         attrs = {"name" : f"{typ}" })
 
+                tags = [typ]
+                if "ano" in b:
+                    tags.append("ANO")
                 basisset, = BasisSet.from_gaussian(io.StringIO(f"\n{bas}"),
                                                    duplicate_handling = "force-ignore",
-                                                   attrs = {"name" : f"{typ}-{b}" })
+                                                   attrs = {"name" : f"{typ}-{b}",
+                                                            "n_el" : pseudo.n_el_tot,
+                                                            "tags" : tags})
                 pseudos = [{"path": "",
                             "obj": pseudo}]
                 version = 1
@@ -207,7 +211,7 @@ class BFDLibrary(_ExternalLibrary):
         list_of_basis += [ f"{x}_ano" for x in list_of_basis ]
 
         for b in list_of_basis:
-            for ie in range(1, 87):
+            for ie in range(1, 86):
                 l = cls._URL.format(b = b, e = chemical_symbols[ie])
                 add_data(urlopen(l).read(), chemical_symbols[ie], b)
                 """ Cool down """

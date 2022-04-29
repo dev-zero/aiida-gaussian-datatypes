@@ -10,6 +10,7 @@ import dataclasses
 from ..utils import SYM2NUM
 from decimal import Decimal
 from icecream import ic
+import re
 import numpy as np
 
 from aiida.common.exceptions import (
@@ -347,11 +348,8 @@ class Pseudopotential(Data):
         Parser for Gaussian format
         """
 
-        was_comment_line = 2
+        block_counter = 0
         functions = []
-        functions.append({"prefactors" : [],
-                          "polynoms"   : [],
-                          "exponents"  : []})
         for ii, line in enumerate(fhandle):
             ic(line.strip())
             if ii == 0:
@@ -362,13 +360,22 @@ class Pseudopotential(Data):
                 continue
             if ii == 2:
                 continue
-            if was_comment_line == -1:
-                was_comment_line = int(line.strip())
             else:
-                was_comment_line -= 1
-                functions[-1]["exponents"].append(int(line.strip()[0]))
-                functions[-1]["polynoms"].append(float(line.strip()[1]))
-                functions[-1]["prefactors"].append(float(line.strip()[2]))
+                ic(block_counter)
+                if block_counter == 0:
+                    if line.strip() == "":
+                        continue
+                    m = re.match("[ ]*([0-9])+[ ]*$", line)
+                    if m:
+                        block_counter = int(m.group(1))
+                        functions.append({"prefactors" : [],
+                                          "polynoms"   : [],
+                                          "exponents"  : []})
+                else:
+                    functions[-1]["polynoms"].append(int(line.strip().split()[0]))
+                    functions[-1]["exponents"].append(float(line.strip().split()[1]))
+                    functions[-1]["prefactors"].append(float(line.strip().split()[2]))
+                    block_counter -= 1
 
         """
         Change the order of functions so they match orbital momentum
