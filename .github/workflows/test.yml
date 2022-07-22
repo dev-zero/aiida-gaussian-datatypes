@@ -6,22 +6,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
+        python-version: ['3.8', '3.9', '3.10']
 
     services:
       postgres:
-        image: postgres:10
-        env:
-          POSTGRES_DB: test
-          POSTGRES_PASSWORD: ''
-          POSTGRES_HOST_AUTH_METHOD: trust
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+        image: postgres:12
       rabbitmq:
         image: rabbitmq:latest
         ports:
@@ -50,7 +39,6 @@ jobs:
 
     - name: Install python dependencies
       run: |
-        pip install --upgrade pip
         pip install .[testing]
 
     - name: Run test suite
