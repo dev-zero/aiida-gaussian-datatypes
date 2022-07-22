@@ -1,1 +1,4 @@
 include pyproject.toml
+include setup.json
+global-exclude .gitignore
+recursive-exclude .github *

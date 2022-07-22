@@ -18,7 +18,7 @@
         "Intended Audience :: Science/Research",
         "Framework :: AiiDA"
     ],
-    "version": "0.5.0",
+    "version": "0.5.1",
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
@@ -34,7 +34,6 @@
         ]
     },
     "scripts": [],
-    "reentry_register": true,
     "install_requires": [
         "aiida-core >= 1.6.2",
         "cp2k-input-tools >= 0.8.0"
