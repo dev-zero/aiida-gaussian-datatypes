@@ -34,7 +34,6 @@
         ]
     },
     "scripts": [],
-    "reentry_register": true,
     "install_requires": [
         "aiida-core >= 1.6.2",
         "cp2k-input-tools >= 0.8.0"
