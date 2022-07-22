@@ -7,13 +7,12 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.7', '3.8', '3.9', '3.10']
-        backend: ['django']
 
     services:
       postgres:
         image: postgres:10
         env:
-          POSTGRES_DB: test_${{ matrix.backend }}
+          POSTGRES_DB: test
           POSTGRES_PASSWORD: ''
           POSTGRES_HOST_AUTH_METHOD: trust
         options: >-
@@ -56,7 +55,6 @@ jobs:
 
     - name: Run test suite
       env:
-        AIIDA_TEST_BACKEND: ${{ matrix.backend }}
         PYTEST_ADDOPTS: "--durations=0"
       run: pytest --cov-report xml --cov-report term-missing --cov-append --cov aiida_gaussian_datatypes tests/
 
