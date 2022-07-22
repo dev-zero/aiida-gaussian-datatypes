@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: [3.7, 3.8, 3.9, 3.10]
         backend: ['django']
 
     services:
@@ -29,8 +29,8 @@ jobs:
           - 5672:5672
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-python@v2
+    - uses: actions/checkout@v3
+    - uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
         architecture: x64
@@ -61,7 +61,7 @@ jobs:
         PYTEST_ADDOPTS: "--durations=0"
       run: pytest --cov-report xml --cov-report term-missing --cov-append --cov aiida_gaussian_datatypes tests/
 
-    - uses: codecov/codecov-action@v1
+    - uses: codecov/codecov-action@v3.1.0
       with:
         file: ./coverage.xml
         fail_ci_if_error: true
