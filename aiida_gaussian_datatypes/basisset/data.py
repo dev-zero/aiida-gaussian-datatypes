@@ -330,12 +330,12 @@ class BasisSetCommon(Data):
             if ii == 1:
                 element = line.lower().split()[0]
                 continue
-            if re.match("^[A-z ]+[0-9\. ]*$", line):
+            if re.match(r"^[A-z ]+[0-9\. ]*$", line):
                 if len(data) != 0:
                     block_creator(data, orb)
                 data = []
                 orb = line.lower().split()[0]
-            if re.match("^[+-.0-9 ]+$", line):
+            if re.match(r"^[+-.0-9 ]+$", line):
                 exp, cont, = [ float(x) for x in line.split() ]
                 data.append({"exp" : exp,
                              "cont" : cont })
