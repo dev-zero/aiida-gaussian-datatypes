@@ -17,6 +17,9 @@ from aiida.cmdline.utils import decorators, echo
 
 from ..utils import click_parse_range
 
+if not hasattr(echo, "echo_report"):  # monkeypatch the new echo_report in old versions of aiida
+    echo.echo_report = echo.echo_info
+
 
 def _names_column(name, aliases):
     return ", ".join(["\033[1m{}\033[0m".format(name), *[a for a in aliases if a != name]])
@@ -102,7 +105,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
     bsets = loaders[fformat](basisset_file, filters, duplicates)
 
     if not bsets:
-        echo.echo_info("No valid Gaussian Basis Sets found in the given file matching the given criteria")
+        echo.echo_report("No valid Gaussian Basis Sets found in the given file matching the given criteria")
         return
 
     if len(bsets) == 1:
@@ -111,7 +114,7 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
         bset.store()
 
     else:
-        echo.echo_info("{} Gaussian Basis Sets found:\n".format(len(bsets)))
+        echo.echo_report("{} Gaussian Basis Sets found:\n".format(len(bsets)))
         echo.echo(_formatted_table_import(bsets))
         echo.echo("")
 
@@ -121,12 +124,12 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
             value_proc=lambda v: click_parse_range(v, len(bsets)))
 
         for idx in indexes:
-            echo.echo_info("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
+            echo.echo_report("Adding Gaussian Basis Set for: {b.element} ({b.name})... ".format(b=bsets[idx]), nl=False)
             bsets[idx].store()
             echo.echo("DONE")
 
     if group:
-        echo.echo_info(f"The created Gaussian Basis Set nodes were added to group '{group.label}'")
+        echo.echo_report(f"The created Gaussian Basis Set nodes were added to group '{group.label}'")
         group.store()
         group.add_nodes(bsets)
 
@@ -162,7 +165,7 @@ def list_basisset(sym, name, tags):
         echo.echo("No Gaussian Basis Sets found.")
         return
 
-    echo.echo_info("{} Gaussian Basis Sets found:\n".format(query.count()))
+    echo.echo_report("{} Gaussian Basis Sets found:\n".format(query.count()))
     echo.echo(_formatted_table_list(bs for [bs] in query.iterall()))
     echo.echo("")
 
@@ -220,6 +223,6 @@ def dump_basisset(sym, name, tags, output_format, data):
 
     for bset in data:
         if echo.is_stdout_redirected():
-            echo.echo_info("Dumping {}/{} ({})...".format(bset.name, bset.element, bset.uuid), err=True)
+            echo.echo_report("Dumping {}/{} ({})...".format(bset.name, bset.element, bset.uuid), err=True)
 
         writers[output_format](bset, sys.stdout)

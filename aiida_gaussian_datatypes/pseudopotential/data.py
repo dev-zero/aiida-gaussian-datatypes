@@ -9,9 +9,10 @@ Gaussian Pseudopotential Data class
 import dataclasses
 from ..utils import SYM2NUM
 from decimal import Decimal
-from icecream import ic
 import re
 import numpy as np
+from decimal import Decimal
+from typing import Any, Dict
 
 from aiida.common.exceptions import (
     MultipleObjectsError,
@@ -20,6 +21,7 @@ from aiida.common.exceptions import (
     ValidationError,
 )
 from aiida.orm import Data, Group
+from cp2k_input_tools.pseudopotentials import PseudopotentialData
 
 
 class Pseudopotential(Data):
@@ -257,37 +259,10 @@ class Pseudopotential(Data):
 
             return True
 
-        def dict_fact(data):
-            """
-            Convert the list of tuples to a dict with:
-            * Decimals replaced by strings
-            * the required attrs set on the root
-            * the key "coefficients" replaced with "coeffs"
-            """
-
-            def decimal2str(val):
-                if isinstance(val, Decimal):
-                    return str(val)
-
-                if isinstance(val, list) and val and isinstance(val[0], Decimal):
-                    return [str(v) for v in val]
-
-                return val
-
-            pseudo_dict = {k if k != "coefficients" else "coeffs": decimal2str(v) for k, v in data}
-
-            if "identifiers" in pseudo_dict:  # if this is the root dict, replace 'identifiers'
-                pseudo_dict["aliases"] = sorted(pseudo_dict.pop("identifiers"), key=lambda i: -len(i))
-                pseudo_dict["name"] = pseudo_dict["aliases"][0]
-                pseudo_dict["tags"] = pseudo_dict["name"].split("-")
-
-            return pseudo_dict
-
         pseudos = [
             p
             for p in (
-                dataclasses.asdict(p, dict_factory=dict_fact)
-                for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
+                _pseudodata2dict(p) for p in PseudopotentialData.datafile_iter(fhandle, keep_going=ignore_invalid)
             )
             if matches_criteria(p)
         ]
@@ -882,9 +857,37 @@ def _dict2pseudodata(data):
         PseudopotentialDataNonLocal,
     )
 
-    type_hooks = {
-        PseudopotentialDataLocal: lambda d: {"coefficients": d["coeffs"], **d},
-        PseudopotentialDataNonLocal: lambda d: {"coefficients": d["coeffs"], **d},
-    }
+def _pseudodata2dict(data: PseudopotentialData) -> Dict[str, Any]:
+    """
+    Convert a PseudopotentialData to a compatible dict with:
+    * Decimals replaced by strings
+    * the required attrs set on the root
+    * the key "coefficients" replaced with "coeffs"
+    """
 
-    return PseudopotentialData.from_dict({"identifiers": data["aliases"], **data}, type_hooks=type_hooks)
+    pseudo_dict = data.dict(by_alias=True)
+
+    stack = [pseudo_dict]
+    while stack:
+        current = stack.pop()
+        for key, val in current.items():
+            if isinstance(val, dict):
+                stack.append(val)
+            elif isinstance(val, Decimal):
+                current[key] = str(val)
+            elif isinstance(val, list) and val and isinstance(val[0], dict):
+                stack += val
+            elif isinstance(val, list) and val and isinstance(val[0], Decimal):
+                current[key] = [str(v) for v in val]
+
+    pseudo_dict["aliases"] = sorted(pseudo_dict.pop("identifiers"), key=lambda i: -len(i))
+    pseudo_dict["name"] = pseudo_dict["aliases"][0]
+    pseudo_dict["tags"] = pseudo_dict["name"].split("-")
+
+    return pseudo_dict
+
+
+def _dict2pseudodata(data: Dict[str, Any]) -> PseudopotentialData:
+    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version")}
+    obj["identifiers"] = obj.pop("aliases")
+    return PseudopotentialData.parse_obj(obj)
