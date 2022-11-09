@@ -523,9 +523,9 @@ class Pseudopotential(Data):
 
         if hasattr(fhandle, "name"):
             import re
-            if re.match("Z[0-9]{1,2}\_atomnumber[0-9]{1,2}\.[A-z]+",
+            if re.match(r"Z[0-9]{1,2}\_atomnumber[0-9]{1,2}\.[A-z]+",
                         fhandle.name):
-                ret = re.match("Z[0-9]{1,2}\_atomnumber([0-9]{1,2})\.[A-z]+",
+                ret = re.match(r"Z[0-9]{1,2}\_atomnumber([0-9]{1,2})\.[A-z]+",
                                fhandle.name)
                 atnum = int(ret.group(1))
                 element = list(SYM2NUM.keys())[list(SYM2NUM.values()).index(atnum)]
@@ -888,6 +888,6 @@ def _pseudodata2dict(data: PseudopotentialData) -> Dict[str, Any]:
 
 
 def _dict2pseudodata(data: Dict[str, Any]) -> PseudopotentialData:
-    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version")}
+    obj = {k: v for k, v in data.items() if k not in ("name", "tags", "version", "n_el_tot")}
     obj["identifiers"] = obj.pop("aliases")
     return PseudopotentialData.parse_obj(obj)
