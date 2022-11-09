@@ -22,19 +22,30 @@
     "entry_points": {
         "aiida.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.data:BasisSet",
-            "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.data:Pseudopotential"
+            "gaussian.basissetfree = aiida_gaussian_datatypes.basisset.data:BasisSetFree",
+            "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.data:Pseudopotential",
+            "gaussian.pseudo.gthpseudopotential = aiida_gaussian_datatypes.pseudopotential.data:GTHPseudopotential",
+            "gaussian.pseudo.ecppseudopotential = aiida_gaussian_datatypes.pseudopotential.data:ECPPseudopotential"
         ],
         "aiida.cmdline.data": [
             "gaussian.basisset = aiida_gaussian_datatypes.basisset.cli:cli",
-            "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.cli:cli"
+            "gaussian.pseudo = aiida_gaussian_datatypes.pseudopotential.cli:cli",
+            "gaussian = aiida_gaussian_datatypes.fetcher.cli:cli"
         ],
         "aiida.groups": [
             "gaussian.basisset = aiida_gaussian_datatypes.groups:BasisSetGroup",
             "gaussian.pseudo = aiida_gaussian_datatypes.groups:PseudopotentialGroup"
+        ],
+        "aiida.calculations": [
+            "gaussian.uncontract = aiida_gaussian_datatypes.calc.uncontract:uncontract"
         ]
     },
     "scripts": [],
     "install_requires": [
+	"gitpython >= 3.1.24",    
+	"icecream >= 2.1.1",
+	"pydriller >= 2.0",
+        "pydantic >= 1.8.1",
         "aiida-core >= 1.6.2",
         "cp2k-input-tools >= 0.8.0"
     ],

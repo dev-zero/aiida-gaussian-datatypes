@@ -81,7 +81,7 @@ def test_validation_empty():
 
 
 def test_validation_invalid_local():
-    Pseudo = DataFactory("gaussian.pseudo")
+    Pseudo = DataFactory("gaussian.pseudo.gthpseudopotential")
     pseudo = Pseudo(name="test", element="H", local={"r": 1.23, "coeffs": [], "something": "else"})
 
     with pytest.raises(ValidationError):
@@ -97,6 +97,20 @@ def test_get_matching_empty():
     with pytest.raises(NotExistent):
         pseudos[0].get_matching_basisset()
 
+
+def test_import_from_gamess():
+    Pseudopotential = DataFactory("gaussian.pseudo")
+
+    with open(TEST_DIR.joinpath("GAMESS_ECP.B"), "r") as fhandle:
+        # get only the He PADE pseudo
+        pseudos = Pseudopotential.from_gamess( fhandle )
+
+    assert len(pseudos) == 1
+
+    pseudos[0].store()
+
+    # check that the name is used for the node label
+    assert pseudos[0].label == pseudos[0].name
 
 def test_to_cp2k():
     """Check whether writing a CP2K datafile works"""

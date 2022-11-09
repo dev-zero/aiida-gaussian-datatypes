@@ -73,7 +73,8 @@ def cli():
     multiple=True,
     help="filter by a tag (all tags must be present if specified multiple times)")
 @click.option(
-    'fformat', '-f', '--format', type=click.Choice(['cp2k']), default='cp2k',
+    'fformat', '-f', '--format', type=click.Choice(['cp2k',
+                                                    'nwchem']), default='cp2k',
     help="the format of the basis set file")
 @click.option(
     '--duplicates',
@@ -92,6 +93,8 @@ def import_basisset(basisset_file, fformat, sym, tags, duplicates, group):
 
     loaders = {
         "cp2k": BasisSet.from_cp2k,
+        "nwchem": BasisSet.from_nwchem,
+        "gaussian": BasisSet.from_gaussian,
     }
 
     filters = {
@@ -176,7 +179,7 @@ def list_basisset(sym, name, tags):
               help="filter by name")
 @click.option('tags', '--tag', '-t', multiple=True,
               help="filter by a tag (all tags must be present if specified multiple times)")
-@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', ]), default='cp2k',
+@click.option('output_format', '-f', '--format', type=click.Choice(['cp2k', 'nwchem', 'gamess',]), default='cp2k',
               help="Chose the output format for the basiset: " + ', '.join(['cp2k', ]))
 # fmt: on
 @decorators.with_dbenv()
@@ -191,6 +194,8 @@ def dump_basisset(sym, name, tags, output_format, data):
 
     writers = {
         "cp2k": BasisSet.to_cp2k,
+        "nwchem" : BasisSet.to_nwchem,
+        "gamess" : BasisSet.to_gamess,
     }
 
     if data:

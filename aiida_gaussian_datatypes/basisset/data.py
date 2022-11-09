@@ -14,12 +14,15 @@ from aiida.common.exceptions import (
     NotExistent,
     UniquenessError,
     ValidationError,
+    ParsingError
 )
+import re
 from aiida.orm import Data, Group
+from pathlib import Path
 from cp2k_input_tools.basissets import BasisSetData
 
 
-class BasisSet(Data):
+class BasisSetCommon(Data):
     """
     Provide a general way to store GTO basis sets from different codes within the AiiDA framework.
     """
@@ -46,7 +49,7 @@ class BasisSet(Data):
         if "label" not in kwargs:
             kwargs["label"] = name
 
-        super(BasisSet, self).__init__(**kwargs)
+        super(BasisSetCommon, self).__init__(**kwargs)
 
         self.set_attribute("name", name)
         self.set_attribute("element", element)
@@ -57,38 +60,24 @@ class BasisSet(Data):
         self.set_attribute("version", version)
 
     def store(self, *args, **kwargs):
-        """
-        Store the node, ensuring that the combination (element,name,version) is unique.
-        """
-        # TODO: this uniqueness check is not race-condition free.
-
-        try:
-            existing = self.get(self.element, self.name, self.version, match_aliases=False)
-        except NotExistent:
-            pass
-        else:
-            raise UniquenessError(
-                f"Gaussian Basis Set already exists for"
-                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
-            )
-
-        return super(BasisSet, self).store(*args, **kwargs)
+        return super(BasisSetCommon, self).store(*args, **kwargs)
 
     def _validate(self):
-        super(BasisSet, self)._validate()
+        super(BasisSetCommon, self)._validate()
 
         try:
             # directly raises an exception for the data if something's amiss, extra fields are ignored
+            # BasisSetData.from_dict({"identifiers": self.aliases, **self.attributes})
             _dict2basissetdata(self.attributes)
 
-            assert isinstance(self.name, str) and self.name
+            #assert isinstance(self.name, str) and self.name
             assert (
                 isinstance(self.aliases, list)
                 and all(isinstance(alias, str) for alias in self.aliases)
                 and self.aliases
             )
-            assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
-            assert isinstance(self.version, int) and self.version > 0
+            #assert isinstance(self.tags, list) and all(isinstance(tag, str) for tag in self.tags)
+            #assert isinstance(self.version, int) and self.version > 0
         except Exception as exc:
             raise ValidationError("One or more invalid fields found") from exc
 
@@ -291,6 +280,240 @@ class BasisSet(Data):
 
         return [cls(**bs) for bs in bsets]
 
+    @classmethod
+    def from_gaussian(cls, fhandle, filters=None, duplicate_handling="ignore", attrs = None):
+        """
+        Constructs a list with basis set objects from a Basis Set in Gaussian format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
+        """
+
+        def exists(bset):
+            try:
+                cls.get(bset["element"], bset["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        """
+        Gaussian parser
+
+        TODO Maybe parser should move to "parsers"
+        """
+
+        element = None
+        data = []
+        blocks = []
+
+        if not attrs:
+            attrs = {}
+
+        def block_creator(b, orb, blocks = blocks):
+            orb_dict = {"s" : 0,
+                        "p" : 1,
+                        "d" : 2,
+                        "f" : 3,
+                        "g" : 4,
+                        "h" : 5,
+                        "i" : 6 }
+            block = { "n": 0, # I dont know how to setup main quantum number
+                      "l": [(orb_dict[orb], 1)],
+                      "coefficients" : [ [ d["exp"], d["cont"] ] for d in b ] }
+            blocks.append(block)
+
+        orb = "x"
+        for ii, line in enumerate(fhandle):
+            if ii == 1:
+                element = line.lower().split()[0]
+                continue
+            if re.match(r"^[A-z ]+[0-9\. ]*$", line):
+                if len(data) != 0:
+                    block_creator(data, orb)
+                data = []
+                orb = line.lower().split()[0]
+            if re.match(r"^[+-.0-9 ]+$", line):
+                exp, cont, = [ float(x) for x in line.split() ]
+                data.append({"exp" : exp,
+                             "cont" : cont })
+        if len(data) != 0:
+            block_creator(data, orb)
+            data = []
+
+        try:
+            basis = {"element" : element.capitalize(),
+                     "version" : 1,
+                     "name" : "unknown",
+                     "tags" : [],
+                     "aliases" : [],
+                     "blocks" : blocks }
+        except:
+            return []
+
+        basis["name"] = "NA"
+
+        if hasattr(fhandle, "name"):
+            basis["name"] = Path(fhandle.name).name.replace(".nwchem", "")
+            basis["aliases"].append(basis["name"].split(".")[-1])
+
+        if "name" in attrs:
+            basis["aliases"].append(basis["name"])
+            basis["name"] = attrs["name"]
+
+        for attr in ("n_el", "tags",):
+            if attr in attrs:
+                basis[attr] = attrs[attr]
+
+        if len(basis["aliases"]) == 0:
+            del basis["aliases"]
+
+        if duplicate_handling == "force-ignore":  # It will check at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(basis):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(basis):
+                raise UniquenessError( f"Gaussian Basis Set already exists for"
+                                       f" element={basis['element']}, name={basis['name']}: {latest.uuid}")
+
+        elif duplicate_handling == "new":
+                try:
+                    latest = cls.get(basis["element"], basis["name"], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    basis["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return [cls(**basis)]
+
+    @classmethod
+    def from_nwchem(cls, fhandle, filters=None, duplicate_handling="ignore", attrs = None):
+        """
+        Constructs a list with basis set objects from a Basis Set in NWCHEM format
+
+        :param fhandle: open file handle
+        :param filters: a dict with attribute filter functions
+        :param duplicate_handling: how to handle duplicates ("ignore", "error", "new" (version))
+        :rtype: list
+        """
+
+        def exists(bset):
+            try:
+                cls.get(bset["element"], bset["name"], match_aliases=False)
+            except NotExistent:
+                return False
+
+            return True
+
+        """
+        NWCHEM parser
+
+        TODO Maybe parser should move to "parsers"
+        """
+
+        element = None
+        data = []
+        blocks = []
+
+        if not attrs:
+            attrs = {}
+
+        def block_creator(b, orb, blocks = blocks):
+            orb_dict = {"s" : 0,
+                        "p" : 1,
+                        "d" : 2,
+                        "f" : 3,
+                        "g" : 4,
+                        "h" : 5,
+                        "i" : 6 }
+            block = { "n": 0, # I dont know how to setup main quantum number
+                      "l": [(orb_dict[orb], 1)],
+                      "coefficients" : [ [ d["exp"], d["cont"] ] for d in b ] }
+            blocks.append(block)
+
+        for line in fhandle:
+            """
+            Element symbol has to be every block
+            """
+            if re.match("^[A-z ]+$", line):
+                if len(data) != 0:
+                    block_creator(data, orb)
+                    data = []
+                el, orb = line.lower().split()
+                if element is None:
+                    """
+                    TODO check validity of element
+                    """
+                    element = el
+                elif element != el:
+                    raise ParsingError(f"Element previous {element}, and now {el}.") # Element cannot be changed
+            if re.match("^[+-.0-9 ]+$", line):
+                exp, cont, = [ float(x) for x in line.split() ]
+                data.append({"exp" : exp,
+                             "cont" : cont })
+        if len(data) != 0:
+            block_creator(data, orb)
+            data = []
+
+        try:
+            basis = {"element" : element.capitalize(),
+                     "version" : 1,
+                     "name" : "unknown",
+                     "tags" : [],
+                     "aliases" : [],
+                     "blocks" : blocks }
+        except:
+            return []
+
+        if hasattr(fhandle, "name"):
+            basis["name"] = Path(fhandle.name).name.replace(".nwchem", "")
+            basis["aliases"].append(basis["name"].split(".")[-1])
+
+        if "name" in attrs:
+            basis["aliases"].append(basis["name"])
+            basis["name"] = attrs["name"]
+
+        for attr in ("n_el", "tags",):
+            if attr in attrs:
+                basis[attr] = attrs[attr]
+
+        if len(basis["aliases"]) == 0:
+            del basis["aliases"]
+
+        if duplicate_handling == "force-ignore":  # It will check at the store stage
+            pass
+
+        elif duplicate_handling == "ignore":  # simply filter duplicates
+            if exists(basis):
+                return []
+
+        elif duplicate_handling == "error":
+            if exists(basis):
+                raise UniquenessError( f"Gaussian Basis Set already exists for"
+                                       f" element={basis['element']}, name={basis['name']}: {latest.uuid}")
+
+        elif duplicate_handling == "new":
+                try:
+                    latest = cls.get(basis["element"], basis["name"], match_aliases=False)
+                except NotExistent:
+                    pass
+                else:
+                    basis["version"] = latest.version + 1
+
+        else:
+            raise ValueError(f"Specified duplicate handling strategy not recognized: '{duplicate_handling}'")
+
+        return [cls(**basis)]
+
     def to_cp2k(self, fhandle):
         """
         Write the Basis Set to the passed file handle in the format expected by CP2K.
@@ -301,6 +524,85 @@ class BasisSet(Data):
         for line in _dict2basissetdata(self.attributes).cp2k_format_line_iter():
             fhandle.write(line)
             fhandle.write("\n")
+
+    def to_nwchem(self, fhandle):
+        """
+        Write the Basis Set to the passed file handle in the format expected by NWCHEM.
+
+        :param fhandle: A valid output file handle
+        """
+        orb_dict = {0 : "s",
+                    1 : "p",
+                    2 : "d",
+                    3 : "f",
+                    4 : "g",
+                    5 : "h",
+                    6 : "i" }
+
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for block in self.blocks:
+            offset = 0
+            for orb, num, in block["l"]:
+                fhandle.write(f"{self.element} {orb_dict[orb]}\n")
+                for lnum in range(num):
+                    for entry in block["coefficients"]:
+                        exponent = entry[0]
+                        coefficient = entry[1 + lnum + offset]
+                        fhandle.write(f"  {exponent:15.7f} {coefficient:15.7f}\n")
+                offset = num
+
+    def to_gamess(self, fhandle):
+        """
+        Write the Basis Set to the passed file handle in the format expected by GAMESS.
+
+        :param fhandle: A valid output file handle
+        """
+        orb_dict = {0 : "s",
+                    1 : "p",
+                    2 : "d",
+                    3 : "f",
+                    4 : "g",
+                    5 : "h",
+                    6 : "i" }
+
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for block in self.blocks:
+            offset = 0
+            for orb, num, in block["l"]:
+                fhandle.write(f" {orb_dict[orb].upper()}  {len(block['coefficients'])}\n")
+                for lnum in range(num):
+                    for ii, entry in enumerate(block["coefficients"]):
+                        exponent = entry[0]
+                        coefficient = entry[1 + lnum + offset]
+                        fhandle.write(f"  {ii + 1:3d} {exponent:15.7f} {coefficient:15.7f}\n")
+                offset = num
+
+    def to_gaussian(self, fhandle):
+        """
+        Write the Basis Set to the passed file handle in the format expected by Gaussian.
+
+        :param fhandle: A valid output file handle
+        """
+        orb_dict = {0 : "s",
+                    1 : "p",
+                    2 : "d",
+                    3 : "f",
+                    4 : "g",
+                    5 : "h",
+                    6 : "i" }
+
+        fhandle.write(f"# from AiiDA BasisSet<uuid: {self.uuid}>\n")
+        for block in self.blocks:
+            offset = 0
+            for orb, num, in block["l"]:
+                fhandle.write(f" {orb_dict[orb].upper()}  {len(block['coefficients'])}\n")
+                for lnum in range(num):
+                    for ii, entry in enumerate(block["coefficients"]):
+                        exponent = entry[0]
+                        coefficient = entry[1 + lnum + offset]
+                        fhandle.write(f"  {ii + 1:3d} {exponent:15.7f} {coefficient:15.7f}\n")
+                offset = num
+
 
     def get_matching_pseudopotential(self, *args, **kwargs):
         """
@@ -314,6 +616,36 @@ class BasisSet(Data):
         else:
             return Pseudopotential.get(element=self.element, *args, **kwargs)
 
+class BasisSet(BasisSetCommon):
+
+    def __init__(self, *args, **kwargs):
+        super(BasisSet, self).__init__(*args, **kwargs)
+
+    def store(self, *args, **kwargs):
+        """
+        Store the node, ensuring that the combination (element,name,version) is unique.
+        """
+        # TODO: this uniqueness check is not race-condition free.
+
+        try:
+            existing = self.get(self.element, self.name, self.version, match_aliases=False)
+        except NotExistent:
+            pass
+        else:
+            raise UniquenessError(
+                f"Gaussian Basis Set already exists for"
+                f" element={self.element}, name={self.name}, version={self.version}: {existing.uuid}"
+            )
+
+        return super(BasisSet, self).store(*args, **kwargs)
+
+class BasisSetFree(BasisSetCommon):
+
+    def __init__(self, *args, **kwargs):
+        super(BasisSetFree, self).__init__(*args, **kwargs)
+
+    def store(self, *args, **kwargs):
+        return super(BasisSetFree, self).store(*args, **kwargs)
 
 def _basissetdata2dict(data: BasisSetData) -> Dict[str, Any]:
     """
